@@ -1,0 +1,18 @@
+# Summary
+
+- [chapter 01 rust overview](./chapter_01_rust_overview.md)
+- [chapter 02 variables types control](./chapter_02_variables_types_control.md)
+- [chapter 03 ownership borrowing](./chapter_03_ownership_borrowing.md)
+- [chapter 04 structs enums](./chapter_04_structs_enums.md)
+- [chapter 05 generics traits](./chapter_05_generics_traits.md)
+- [chapter 06 error handling](./chapter_06_error_handling.md)
+- [chapter 07 collections](./chapter_07_collections.md)
+- [chapter 08 modules](./chapter_08_modules.md)
+- [chapter 09 concurrency](./chapter_09_concurrency.md)
+- [chapter 10 network programming](./chapter_10_network_programming.md)
+- [chapter 11 database operations](./chapter_11_database_operations.md)
+- [chapter 12 web development](./chapter_12_web_development.md)
+- [chapter 13 performance optimization](./chapter_13_performance_optimization.md)
+- [chapter 14 security programming](./chapter_14_security_programming.md)
+- [chapter 15 testing](./chapter_15_testing_and_debugging.md)
+- [chapter 16 deployment](./chapter_16_deployment_operations.md)

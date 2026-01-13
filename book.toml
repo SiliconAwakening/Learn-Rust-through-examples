@@ -1,0 +1,5 @@
+[book]
+authors = ["lihongchao"]
+default-language = "en" 
+src = "src"
+title = "Learn Rust through examples"

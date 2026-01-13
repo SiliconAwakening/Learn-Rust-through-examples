@@ -1,0 +1,64 @@
+[package]
+name = "config-manager"
+version = "1.0.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "Enterprise configuration management tool"
+license = "MIT"
+repository = "https://github.com/yourname/config-manager"
+
+[dependencies]
+# 配置解析
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+toml = "0.7"
+
+# 异步和并发
+tokio = { version = "1.0", features = ["full"] }
+crossbeam = "0.8"
+rayon = "1.7"
+futures = "0.3"
+
+# 文件监控
+notify = "6.0"
+
+# CLI
+clap = { version = "4.0", features = ["derive"] }
+regex = "1.8"
+
+# 日志
+slog = "2.7"
+slog-term = "2.9"
+slog-async = "2.7"
+
+# 错误处理
+thiserror = "1.0"
+
+# 系统
+tempfile = "3.5"
+
+[dev-dependencies]
+criterion = "0.5"
+proptest = "1.0"
+
+[build-dependencies]
+cc = "1.0"
+
+[[example]]
+name = "basic_usage"
+path = "examples/basic_usage.rs"
+
+[[example]]
+name = "hot_reload"
+path = "examples/hot_reload.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[features]
+default = []
+dev = ["criterion"]
