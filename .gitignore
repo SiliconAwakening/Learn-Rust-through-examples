@@ -1,1 +1,35 @@
-book
+# mdBook 生成的输出目录（最重要！必须忽略）
+book/
+
+# 临时文件和备份
+*.tmp
+*.bak
+*~
+
+# 编辑器和 IDE 文件
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# OS 生成的文件
+._*
+*.orig
+
+# mdBook 可能产生的其他临时目录（可选）
+theme/
+static/
+
+# 日志文件
+*.log
+
+# 如果你使用了 preprocessors 或插件产生的缓存
+.cache/
+target/          # 如果你同时开发 mdBook 插件（Rust 项目）
+
+# 环境配置文件（如果有敏感信息）
+.env
+book.toml.local
+back
