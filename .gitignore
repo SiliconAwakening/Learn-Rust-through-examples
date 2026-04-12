@@ -1,6 +1,7 @@
 # mdBook 生成的输出目录（最重要！必须忽略）
 book/
-
+zh/book/
+en/book/
 # 临时文件和备份
 *.tmp
 *.bak

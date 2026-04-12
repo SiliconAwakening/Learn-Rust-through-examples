@@ -4,7 +4,6 @@
 - [Variables, Types and Control](chapter_02_variables_types_control.md)
 - [Ownership & Borrowing](chapter_03_ownership_borrowing.md)
 - [Structs & Enums](chapter_04_structs_enums.md)
-- [Chapter 04 Summary](chapter_04_summary.md)
 - [Generics & Traits](chapter_05_generics_traits.md)
 - [Error Handling](chapter_06_error_handling.md)
 - [Collections](chapter_07_collections.md)
