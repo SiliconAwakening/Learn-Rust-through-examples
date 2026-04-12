@@ -30,12 +30,33 @@
 
 ### 5.2.1 什么是泛型
 
-泛型允许我们编写可以处理多种数据类型的代码，而不需要为每种类型单独实现。通过泛型，我们可以创建：
-- 泛型函数
-- 泛型结构体
-- 泛型枚举
-- 泛型方法
+在 Rust 的宏与泛型体系中，泛型（Generics）是构建 零拷贝、类型安全、高性能程序的核心基石。如果说 Rust 库是“积木”，那么泛型就是赋予这些积木“通用模具”的能力。
 
+**Rust 泛型的本质：**
+
+允许你定义 “带有类型参数”的结构和函数 。编译器会帮你处理类型，你只需要定义逻辑。
+
+> 通俗比喻：
+>  - 泛型就像是一个 “万能盒子” 。
+> 
+>  - 没有泛型：你需要为盒子装“苹果”做一个盒子，再为盒子装“梨子”做一个盒子。
+> -  有泛型：你只需要做一个“盒子”，告诉它“盒子可以装苹果，也可以装梨子”，你只需要声明“装的东西”是 T 类型，Rust 编译器会确保你装进去的一定是合法的东西。
+
+Rust 泛型主要分为两个部分：**Type Parameters（类型参数）** 和 **Associated Types（相关类型）**。初学者主要关注前者。
+
+```rust
+// 定义一个结构体，其中 T 代表任意类型
+struct Box<T> {
+    data: T,          // 这里 T 是类型参数
+    capacity: usize,
+}
+
+// 使用泛型结构体
+let my_box_int = Box { data: 10, capacity: 5 };
+let my_box_str = Box { data: "Hello".to_string(), capacity: 5 };
+
+// 编译器会确保 data 的类型与定义一致
+```
 ### 5.2.2 泛型函数
 
 让我们从一个简单的泛型函数开始：
@@ -70,6 +91,18 @@ fn main() {
 
 ### 5.2.3 泛型结构体
 
+如果说泛型是 Rust 的“骨架”，那么 泛型结构体和 泛型枚举就是构建这个骨架最核心的两块砖。掌握这两者，你就能写出像 Vec、 Option 这样既灵活又类型安全的 Rust 代码。
+
+想象你在盖房子。
+
+> **非泛型**：你想盖一座“别墅”，就需要专门设计一套图纸；你想盖一套“公寓”，又要另一套图纸。
+> **泛型**：你设计了一个“模块化模板”，通过改变模板里的“砖块类型”（T），它可以变成“别墅”，也可以变成“公寓”。
+
+在 Rust 中，泛型结构体允许你在定义时声明一个“类型变量”（通常用 T 表示），让该结构体可以封装任意一种类型。
+
+泛型结构体最强大的地方：你可以为结构体定义通用方法。
+
+你需要使用 impl<T> 来为泛型结构体实现方法。
 ```rust
 // 泛型结构体
 #[derive(Debug, Clone)]
@@ -126,7 +159,19 @@ fn main() {
 }
 ```
 
+> **⚠️ 注意点**：
+> - 泛型方法中的 `T` 必须与结构体的 `T` 一致。
+> - 如果结构体中有字段是 `Option<T>` 或 `&T`，泛型方法中仍然可以使用 `T`。
+> - Rust 不允许像 Java 那样直接通过 `Pair<T>` 调用，必须在 `impl` 块中显式实现。
+
 ### 5.2.4 泛型枚举
+
+枚举（Enum）是 Rust 中定义“多种可能状态”的最佳方式。
+- **非泛型**：`enum Status { Active, Disabled }`
+- **泛型**：`enum Status<T> { Active, Disabled }` —— 这里 `Active` 和 `Disabled` 的具体含义依赖于类型 `T`。
+
+最常见的泛型枚举是 `Option<T>`（`Some` 包含 T，`None` 不）。
+### 🛠 定义与使用
 
 ```rust
 // 泛型枚举示例
@@ -169,27 +214,94 @@ impl<T> Option<T> {
     }
 }
 
-fn main() {
-    let success: Result<i32, &str> = Ok(42);
-    let failure: Result<i32, &str> = Err("something went wrong");
-    
-    let present: Option<i32> = Some(100);
-    let absent: Option<i32> = None;
-    
-    println!("成功: {}, 失败: {}", success.is_ok(), failure.is_err());
-    println!("存在: {}, 缺失: {}", present.is_some(), absent.is_none());
-    println!("unwrap 结果: {}", present.unwrap());
-    println!("unwrap_or 结果: {}", absent.unwrap_or(0));
-}
 ```
+> **⚠️ 注意点**：
+> - **`impl` 位置**：泛型枚举的 impl 块不能放在枚举定义的内部，而必须放在枚举定义的外部（模块层级）。当为泛型枚举实现方法时，需要显式写出 impl<T>（或带有约束的 impl<T: Bound>），以声明该实现适用于所有类型 T（或满足约束的 T）。
+> - **`Associated Types`**：像 `Option<T>` 中的 `Some`，虽然它只包含一个 `T`，但 `Option` 本身是一个泛型类型。
+> - **`Result` 的变种**：`Result<T, E>` 是一个更复杂的泛型枚举，它有两个类型参数 `T` 和 `E`。
 
-## 5.3 特征基础
+
+### 5.2.5 泛型结构体 vs 泛型枚举
+
+| 特性 | 泛型结构体 (Struct) | 泛型枚举 (Enum) |
+| :--- | :--- | :--- |
+| **用途** | 数据容器、封装逻辑 | 状态机、多态模式、分支逻辑 |
+| **灵活性** | 适合封装对象属性 | 适合表达“不同情况下的不同类型” |
+| **实现方法** | `impl<T> StructName` | `impl<T> EnumName` (需考虑所有变体) |
+| **典型例子** | `Box<T>`, `Vec<T>` (内部结构) | `Option<T>`, `Result<T, E>` |
+
+### 📝 什么时候该用哪个？
+
+1.  **选泛型结构体**：
+    - 当你想要封装一组**属性**，且这些属性都**同类型**时（例如 `Pair<T>` 的 `first` 和 `second` 都是 `T`）。
+    - 当你需要类似 Java 的 `Class` 那种封装数据的感觉。
+
+2.  **选泛型枚举**：
+    - 当你有**多种模式**，且这些模式代表了**不同的行为**时（例如 `Option` 是“有值”或“无值”，`Result` 是“成功”或“失败”）。
+    - 枚举允许你**在定义时即可定义类型**，这是 Rust 泛型中最强大的特性之一。
+
+
+
+## 5.3 特征
 
 ### 5.3.1 什么是特征
 
 特征（Trait）定义了一组可以由不同类型实现的方法。它们类似于其他语言中的接口，但功能更强大。
 
-### 5.3.2 定义和使用特征
+**Rust 的 Trait 本质**：
+它定义了一组**行为（方法）的集合**。如果一个类型实现了这个 Trait，它就获得了这些行为的能力。
+
+> **Rust 的 Trait 与 Java/C++ 的区别**：
+> Java/C++ 的接口（Interface）通常指向运行时多态（动态类型）。
+> Rust 的 Trait 指向**编译期多态**（静态类型）。
+> - **Java**: 运行时多态（`obj` 是运行时类型，`obj.method()` 调用接口）。
+> - **Rust**: 编译期多态（`trait` 是模板，编译器为每个类型生成具体代码，无运行时开销）。
+
+#### 🧩 为什么 Rust 需要 Trait？
+1. **抽象化**：将不同结构体的行为统一。
+2. **类型安全**：确保 `T` 只有在满足某些能力（如 `Copy` 或 `Send`）时才能使用。
+3. **无拷贝（Zero-Cost）**：Trait 的约束在编译期解决，运行时没有虚表开销（Virtual Table Overhead）。
+
+### 5.3.2. 基础语法：定义与使用
+
+Rust 的 Trait 分为两部分：**定义（Definition）** 和 **实现（Implementation）**。
+
+#### 5.3.2.1 定义 Trait
+使用 `trait` 关键字，定义一组方法。
+```rust
+// 定义一个名为 'Clone' 的 Trait（继承自 std）
+trait Clone {
+    fn clone(&self) -> Self;
+}
+
+// 定义 'Display' 特质，用于打印到标准输出
+trait Display {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error>;
+}
+```
+
+#### 5.3.2.2 实现 Trait
+为某个类型（Struct 或 Enum）实现 Trait 方法。
+```rust
+struct Boxed <T> {
+    data: T,
+}
+
+// 为 Boxed<T> 实现 Clone 方法
+impl<T> Clone for Boxed<T> {
+    fn clone(&self) -> Boxed<T> {
+        // 实际逻辑：复制内部数据
+        Boxed {
+            data: self.data.clone(),
+        }
+    }
+}
+```
+
+> **💡 注意**：
+> - 实现 Trait 时，必须使用 `impl TraitName for Type` 的语法。
+> - 如果类型是泛型（如 `Boxed<T>`），实现时必须包含泛型参数 `<T>`。
+
 
 ```rust
 // 定义一个特征
@@ -274,95 +386,81 @@ fn main() {
 
 ### 5.3.3 特征作为参数
 
+ **“Trait 作为参数” (Trait as Parameter)**，其实并不是指直接传递一个 `Trait` 定义本身（Rust 不支持这个），而是指**如何在一个函数中利用 Trait 的能力**。
+
+主要有两种场景：
+1.  **泛型约束 (`where T: Trait`)**：编译期检查，类型安全。
+2.  **Trait 对象 (`&dyn Trait`)**：运行时多态，类型擦除。
+
 ```rust
 // 使用特征作为函数参数
-fn summarize_shape(shape: &impl Drawable) -> String {
-    format!(
-        "这是一个图形，面积是 {:.2}，状态是 {}",
-        shape.area(),
-        if shape.is_visible() { "可见" } else { "隐藏" }
-    )
+// 定义一个 Trait
+trait Addable<T> {
+    fn add(&self, other: &T) -> T;
 }
 
-// 多个特征约束
-fn create_summary<T: Drawable + Clone>(shape: &T) -> String {
-    // 可以调用两个特征的方法
-    let original = format!("原始: {}", shape.draw());
-    let clone = format!("克隆: {}", shape.clone().draw());
-    format!("{}\n{}", original, clone)
-}
-
-// 返回实现了特征的类型
-fn create_circle() -> impl Drawable {
-    Circle { radius: 3.0 }
-}
-
-// 泛型约束语法
-fn complex_draw<T>(shapes: &[T]) -> Vec<String>
-where
-    T: Drawable,
-{
-    shapes.iter().map(|shape| shape.draw()).collect()
+// 定义一个泛型函数
+fn process<T: Addable>(value: T) {
+    // 这里 T 必须实现 Addable
+    println!("Value is: {}", value);
 }
 ```
+**💡 关键点**
+- **`where` 子句**：你也可以使用 `where` 子句来添加约束。
+    ```rust
+    fn process<T>(value: T) where T: Addable { ... }
+    ```
+- **类型检查**：编译器会检查 `T` 是否实现了 `Addable`。如果 `T` 不是 `i32` 或 `String`，而是任意类型，编译器会报错。
+- **性能**：这是**零开销**的（Zero-Cost）。编译器会生成具体的代码版本，没有运行时开销。
 
-### 5.3.4 特征与泛型结合
 
-```rust
-// 泛型特征
-trait Calculate {
-    type Output;  // 关联类型
-    
-    fn calculate(&self) -> Self::Output;
-}
-
-struct MathOperations<T> {
-    value: T,
-}
-
-impl<T> Calculate for MathOperations<T>
-where
-    T: std::ops::Add<Output = T>
-    + std::ops::Sub<Output = T>
-    + std::ops::Mul<Output = T>
-    + Copy,
-{
-    type Output = T;
-    
-    fn calculate(&self) -> Self::Output {
-        // 使用泛型进行数学运算
-        let a = self.value;
-        let b = self.value;
-        (a + b) * b  // 使用实现了这些运算的类型
-    }
-}
-
-// 泛型特征约束
-fn process_calculate<T>(op: &MathOperations<T>) -> T
-where
-    T: std::ops::Add<Output = T>
-    + std::ops::Sub<Output = T>
-    + std::ops::Mul<Output = T>
-    + Copy
-    + std::fmt::Debug,
-{
-    let result = op.calculate();
-    println!("操作结果: {:?}", result);
-    result
-}
-
-fn main() {
-    let int_op = MathOperations { value: 5 };
-    let float_op = MathOperations { value: 3.14 };
-    
-    let int_result = process_calculate(&int_op);  // 40
-    let float_result = process_calculate(&float_op);  // 19.4784
-}
-```
 
 ## 5.4 特征边界高级用法
 
-### 5.4.1 多个特征约束
+### 5.4.1 多个特征约束（Multiple Trait Bounds）
+
+Rust 允许一个类型 `T` 同时实现多个 Trait。在函数参数或结构体中，你可以使用 `+` 运算符组合多个 Trait 约束。
+
+**语法格式：**
+```rust
+fn process<T: TraitA + TraitB + TraitC>(item: T) { ... }
+```
+
+### 5.4.2. 为什么需要组合约束？
+单一约束不够用。例如，你需要一个既能被 `Clone` 复制，又能被 `Debug` 打印，且是 `Send` 安全的类型。
+
+```rust
+trait Cloneable { fn clone(&self) -> Self; }
+trait Printable { fn print(&self); }
+trait ThreadSafe { /* ... */ }
+
+// ❌ 错误写法：T 被要求同时满足多个约束，编译器会报错
+// fn process<T: Cloneable + Printable + ThreadSafe>(item: T) ... 
+
+// ✅ 正确写法：组合约束
+fn process<T: Cloneable + Printable + ThreadSafe>(item: T) {
+    // item 自动拥有 Clone, Print, ThreadSafe 行为
+    let _clone = item.clone();
+    item.print();
+    // item 必须是线程安全的
+}
+```
+
+### 5.4.3. 约束的顺序有影响吗？
+**没有。** Rust 的 trait bounds 是**集合运算**（Set Union），顺序不影响编译。
+```rust
+fn foo<T: Clone + Debug>(x: T) { } // 等价于 fn foo<T: Debug + Clone>(x: T) { }
+```
+
+### 5.4.4. 特殊情况：超 Traits 与 `Where` 子句
+虽然 `TraitA + TraitB` 很直观，但在复杂场景下，`Where` 子句更灵活。
+```rust
+fn generic_function<T: Clone>() {
+    // 无法直接在这里加约束，需要 Where
+    where T: Clone {} 
+}
+```
+**注意**：`where` 子句允许你在函数内部动态添加约束，适用于某些无法在定义时确定的场景。
 
 ```rust
 // 定义多个特征
@@ -410,7 +508,55 @@ where
 }
 ```
 
-### 5.4.2 特征对象
+### 5.4.2 特征对象（Trait Objects）：动态多态
+
+`dyn Trait` 表示一个动态多态的对象。Rust 允许通过 `&dyn Trait` 或 `Box<dyn Trait>` 来持有 Trait 对象。
+
+**语法格式：**
+```rust
+fn accept_trait_object<T: Trait>(item: T) { ... }
+
+fn accept_dyn_trait(item: &dyn Trait) { ... }
+```
+
+
+
+
+```rust
+trait Drawable {
+    fn draw(&self);
+}
+
+// ✅ 使用 Box<dyn Drawable>
+struct Circle {
+    r: f64,
+}
+
+struct Square {
+    side: f64,
+}
+
+struct Shape {
+    shape: Box<dyn Drawable>,
+}
+
+// 动态多态调用
+impl Drawable for Circle {
+    fn draw(&self) { println!("Drawing Circle"); }
+}
+impl Drawable for Square {
+    fn draw(&self) { println!("Drawing Square"); }
+}
+
+fn main() {
+    let circle = Circle { r: 5.0 };
+    let square = Square { side: 5.0 };
+    
+    let shape: Box<dyn Drawable> = Box::new(circle);
+    println!("Shape: {:?}", shape.draw()); // 动态调用
+}
+```
+
 
 ```rust
 // 特征对象允许我们使用不同类型的相同特征
@@ -446,7 +592,18 @@ fn draw_all_shapes(shapes: &[Box<dyn Drawable>]) {
 }
 ```
 
-### 5.4.3 特征对象 vs 泛型
+### 5.4.3 动态多态 vs 泛型约束
+
+
+
+这是理解的关键点：
+
+| 特性 | 泛型约束 (`T: Trait`) | 动态多态 (`dyn Trait`) |
+| :--- | :--- | :--- |
+| **类型推断** | 编译时确定 | 运行时确定 |
+| **性能** | 编译时调用（无偏移） | 动态调用（有偏移/表） |
+| **使用场景** | 类型已知 | 类型未知 |
+| **安全性** | 类型安全 | 类型安全（但无法 `self`） |
 
 ```rust
 // 泛型方式 - 编译时分派，性能更好
@@ -479,2010 +636,94 @@ fn main() {
 }
 ```
 
-## 5.5 实战项目：数据流框架架构设计
+### 5.13 本章总结
 
-现在让我们开始构建实战项目。首先，我们需要设计数据处理框架的核心架构。
+在本章中，我们系统学习了 Rust 中两大核心抽象机制——**泛型（Generics）** 和 **特征（Traits）**，并通过构建通用数据处理框架的思路，深入理解了如何利用它们设计灵活、高性能、可扩展的企业级代码。
 
-### 5.5.1 框架概述
+**主要知识点回顾：**
 
-我们的数据流框架将使用以下设计模式：
+- **泛型基础**：掌握了类型参数 `T` 的使用，学会了定义泛型函数、泛型结构体（`Container<T>`）和泛型枚举（`Option<T>`、`Result<T, E>`）。理解了 `impl<T>` 和带约束的 `impl<T: Bound>` 的写法。
+- **特征（Traits）**：学会了特征的定义、默认实现、为具体类型实现特征，以及使用特征作为函数参数。
+- **特征边界与约束**：掌握了 `T: Trait`、`where` 子句、多特征约束（`TraitA + TraitB`）的使用，能够灵活限制泛型的行为。
+- **特征对象与动态多态**：理解了 `&dyn Trait` 和 `Box<dyn Trait>` 的作用，区分了**编译时静态分派（泛型）** 与 **运行时动态分派（特征对象）** 的区别、性能差异及适用场景。
+- **设计思想**：泛型提供零成本抽象，特征提供行为抽象，二者结合可以构建高度可复用且类型安全的代码架构。
 
-1. **流水线模式**：数据从源到处理到输出的完整流程
-2. **插件架构**：可插拔的处理器和适配器
-3. **特征约束**：确保组件间的类型安全交互
-4. **泛型实现**：支持多种数据类型和格式
+通过本章的学习，你已经具备了使用泛型和特征编写通用、可扩展代码的能力，这也是从“能写 Rust”迈向“会设计 Rust 系统”的重要一步。
 
-### 5.5.2 核心特征设计
+**核心 takeaway**：
+> **泛型让代码“通用”，特征让代码“有行为”，两者结合让 Rust 代码既安全又灵活**。
 
-```rust
-// 核心特征定义
-use std::fmt::Debug;
-use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
+---
 
-// 数据源特征
-pub trait DataSource<T> {
-    type Error: Debug;
-    
-    /// 读取所有数据
-    fn read(&self) -> Result<Vec<T>, Self::Error>;
-    
-    /// 读取流数据（用于大文件）
-    fn read_stream(&self) -> Result<Box<dyn Iterator<Item = Result<T, Self::Error>>>, Self::Error>;
-    
-    /// 获取数据计数
-    fn count(&self) -> Result<u64, Self::Error>;
-    
-    /// 检查数据源是否有效
-    fn is_valid(&self) -> bool;
-}
+### 5.13 验收标准（学习自检）
 
-// 数据处理器特征
-pub trait DataProcessor<T, U> {
-    type Error: Debug;
-    
-    /// 批量处理数据
-    fn process(&self, data: Vec<T>) -> Result<Vec<U>, Self::Error>;
-    
-    /// 单项处理数据
-    fn process_item(&self, item: T) -> Result<U, Self::Error>;
-    
-    /// 处理数据流
-    fn process_stream(&self, stream: Box<dyn Iterator<Item = T>>) -> Result<Box<dyn Iterator<Item = Result<U, Self::Error>>>, Self::Error>;
-    
-    /// 获取处理器信息
-    fn info(&self) -> ProcessorInfo;
-}
+完成本章后，你应该能够自信地完成以下任务：
 
-// 数据输出特征
-pub trait DataSink<T> {
-    type Error: Debug;
-    
-    /// 写入数据
-    fn write(&self, data: Vec<T>) -> Result<(), Self::Error>;
-    
-    /// 写入数据流
-    fn write_stream(&self, stream: Box<dyn Iterator<Item = T>>) -> Result<(), Self::Error>;
-    
-    /// 刷新输出
-    fn flush(&self) -> Result<(), Self::Error>;
-    
-    /// 获取输出统计
-    fn stats(&self) -> SinkStats;
-}
+1. **基础验收**：
+   - 正确定义泛型函数、泛型结构体和泛型枚举，并为其实现方法。
+   - 为自定义结构体实现至少一个标准特征（如 `Debug`、`Clone`、`Display`）和一个自定义特征。
+   - 使用 `T: Trait` 或 `where` 子句为泛型添加约束。
 
-// 处理器信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProcessorInfo {
-    pub name: String,
-    pub version: String,
-    pub description: String,
-    pub input_type: String,
-    pub output_type: String,
-    pub performance_metrics: PerformanceMetrics,
-}
+2. **进阶验收**：
+   - 能说明泛型（静态分派）与特征对象（动态分派）的区别，并举例说明各自的优缺点和适用场景。
+   - 熟练使用多个特征约束（`+` 运算符或 `where` 子句）。
+   - 设计一个包含关联类型的特征，并正确使用它。
 
-// 性能指标
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PerformanceMetrics {
-    pub processing_time_ms: u64,
-    pub throughput_items_per_second: f64,
-    pub memory_usage_mb: f64,
-}
+3. **项目验收**（数据处理框架相关）：
+   - 能够定义一个通用的 `Processor<T>` 特征，用于不同类型数据的处理。
+   - 使用泛型实现一个可配置的数据管道（Pipeline），支持多种数据源和输出格式。
+   - 使用特征对象实现一个支持动态添加处理器的插件系统。
 
-// 接收器统计
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SinkStats {
-    pub total_written: u64,
-    pub write_time_ms: u64,
-    pub last_write: Option<std::time::SystemTime>,
-}
-```
+**自检方式**：尝试独立完成下面练习题中的中级和高级题目，如果能顺利通过，则说明你已较好掌握本章内容。
 
-### 5.5.3 数据管道实现
+---
 
-```rust
-// 数据管道
-pub struct DataPipeline<S, P, K> 
-where
-    S: DataSource<serde_json::Value>,
-    P: DataProcessor<serde_json::Value, serde_json::Value>,
-    K: DataSink<serde_json::Value>,
-{
-    source: S,
-    processor: P,
-    sink: K,
-    config: PipelineConfig,
-    metrics: PipelineMetrics,
-}
+### 5.14 练习题
 
-#[derive(Debug, Clone)]
-pub struct PipelineConfig {
-    pub batch_size: usize,
-    pub parallel_processing: bool,
-    pub max_concurrency: usize,
-    pub enable_cache: bool,
-    pub cache_ttl_seconds: u64,
-    pub retry_attempts: u32,
-    pub timeout_seconds: u64,
-}
+#### 基础练习（巩固语法）
 
-#[derive(Debug, Clone)]
-pub struct PipelineMetrics {
-    pub start_time: std::time::Instant,
-    pub items_processed: u64,
-    pub items_failed: u64,
-    pub bytes_processed: u64,
-    pub total_time_ms: u64,
-}
+1. 定义一个泛型结构体 `Pair<T>`，包含 `first` 和 `second` 两个字段。为它实现 `new()` 方法和 `swap()` 方法（交换两个值）。
 
-impl Default for PipelineConfig {
-    fn default() -> Self {
-        Self {
-            batch_size: 1000,
-            parallel_processing: true,
-            max_concurrency: 4,
-            enable_cache: true,
-            cache_ttl_seconds: 3600,
-            retry_attempts: 3,
-            timeout_seconds: 300,
-        }
-    }
-}
+2. 定义一个特征 `Summable`，包含一个方法 `sum(&self) -> i32`。分别为 `Vec<i32>` 和自定义的 `Point { x: i32, y: i32 }` 实现该特征（`Point` 的 `sum` 返回 `x + y`）。
 
-impl Default for PipelineMetrics {
-    fn default() -> Self {
-        Self {
-            start_time: std::time::Instant::now(),
-            items_processed: 0,
-            items_failed: 0,
-            bytes_processed: 0,
-            total_time_ms: 0,
-        }
-    }
-}
+3. 编写一个泛型函数 `print_if_large<T: PartialOrd + Display>(value: T, threshold: T)`，当 `value > threshold` 时打印该值。
 
-impl<S, P, K> DataPipeline<S, P, K> 
-where
-    S: DataSource<serde_json::Value>,
-    P: DataProcessor<serde_json::Value, serde_json::Value>,
-    K: DataSink<serde_json::Value>,
-{
-    /// 创建新的数据管道
-    pub fn new(source: S, processor: P, sink: K) -> Self {
-        Self {
-            source,
-            processor,
-            sink,
-            config: PipelineConfig::default(),
-            metrics: PipelineMetrics::default(),
-        }
-    }
-    
-    /// 使用自定义配置创建管道
-    pub fn with_config(source: S, processor: P, sink: K, config: PipelineConfig) -> Self {
-        Self {
-            source,
-            processor,
-            sink,
-            config,
-            metrics: PipelineMetrics::default(),
-        }
-    }
-    
-    /// 运行数据处理管道
-    pub async fn run(&mut self) -> Result<PipelineMetrics, PipelineError> {
-        println!("开始运行数据处理管道...");
-        
-        let start_time = std::time::Instant::now();
-        
-        // 验证组件
-        self.validate_pipeline()?;
-        
-        // 选择处理模式
-        if self.config.parallel_processing {
-            self.run_parallel().await
-        } else {
-            self.run_sequential().await
-        }?;
-        
-        // 更新指标
-        self.metrics.total_time_ms = start_time.elapsed().as_millis() as u64;
-        
-        println!("管道运行完成，处理了 {} 项数据", self.metrics.items_processed);
-        Ok(self.metrics.clone())
-    }
-    
-    /// 顺序执行处理
-    async fn run_sequential(&mut self) -> Result<(), PipelineError> {
-        // 读取数据
-        let data = self.source.read()
-            .map_err(PipelineError::SourceError)?;
-        
-        if data.is_empty() {
-            println!("没有数据需要处理");
-            return Ok(());
-        }
-        
-        println!("读取到 {} 项数据", data.len());
-        
-        // 批量处理数据
-        let chunks = data.chunks(self.config.batch_size);
-        
-        for (chunk_index, chunk) in chunks.enumerate() {
-            let chunk_vec: Vec<_> = chunk.to_vec();
-            
-            // 处理数据块
-            let processed = self.processor.process(chunk_vec)
-                .map_err(PipelineError::ProcessorError)?;
-            
-            // 输出结果
-            self.sink.write(processed)
-                .map_err(PipelineError::SinkError)?;
-            
-            // 更新统计
-            self.metrics.items_processed += chunk_vec.len() as u64;
-            
-            // 进度报告
-            if (chunk_index + 1) % 10 == 0 {
-                println!("已处理 {} 个批次", chunk_index + 1);
-            }
-        }
-        
-        // 刷新输出
-        self.sink.flush()
-            .map_err(PipelineError::SinkError)?;
-            
-        Ok(())
-    }
-    
-    /// 并行执行处理
-    async fn run_parallel(&mut self) -> Result<(), PipelineError> {
-        use tokio::task;
-        use std::sync::Arc;
-        
-        // 读取数据
-        let data = self.source.read()
-            .map_err(PipelineError::SourceError)?;
-        
-        if data.is_empty() {
-            println!("没有数据需要处理");
-            return Ok(());
-        }
-        
-        // 分块处理
-        let chunks: Vec<_> = data.chunks(self.config.batch_size)
-            .map(|chunk| chunk.to_vec())
-            .collect();
-        
-        println!("开始并行处理 {} 个数据块", chunks.len());
-        
-        // 并行处理数据块
-        let mut handles = Vec::new();
-        let max_concurrency = self.config.max_concurrency;
-        
-        for chunk in chunks {
-            if handles.len() >= max_concurrency {
-                // 等待一个任务完成
-                let handle = handles.remove(0);
-                handle.await.map_err(|_| PipelineError::TaskJoinError)?;
-            }
-            
-            let processor = self.processor;
-            let sink = &self.sink;
-            let config = self.config.clone();
-            
-            let handle = task::spawn(async move {
-                // 处理数据
-                let processed = processor.process(chunk)
-                    .map_err(PipelineError::ProcessorError)?;
-                
-                // 写入结果
-                sink.write(processed)
-                    .map_err(PipelineError::SinkError)?;
-                
-                Ok(())
-            });
-            
-            handles.push(handle);
-        }
-        
-        // 等待所有任务完成
-        for handle in handles {
-            handle.await.map_err(|_| PipelineError::TaskJoinError)??;
-        }
-        
-        // 刷新输出
-        self.sink.flush()
-            .map_err(PipelineError::SinkError)?;
-            
-        self.metrics.items_processed = data.len() as u64;
-        Ok(())
-    }
-    
-    /// 验证管道组件
-    fn validate_pipeline(&self) -> Result<(), PipelineError> {
-        // 验证源数据源
-        if !self.source.is_valid() {
-            return Err(PipelineError::SourceInvalid);
-        }
-        
-        // 验证处理器信息
-        let info = self.processor.info();
-        if info.input_type.is_empty() || info.output_type.is_empty() {
-            return Err(PipelineError::InvalidProcessorInfo);
-        }
-        
-        Ok(())
-    }
-    
-    /// 获取管道状态
-    pub fn get_status(&self) -> PipelineStatus {
-        PipelineStatus {
-            is_running: false, // 简化为非运行状态
-            items_processed: self.metrics.items_processed,
-            items_failed: self.metrics.items_failed,
-            total_time_ms: self.metrics.total_time_ms,
-            throughput_per_second: if self.metrics.total_time_ms > 0 {
-                (self.metrics.items_processed as f64) / (self.metrics.total_time_ms as f64 / 1000.0)
-            } else {
-                0.0
-            },
-        }
-    }
-}
+#### 中级练习（综合应用）
 
-/// 管道状态
-#[derive(Debug, Clone)]
-pub struct PipelineStatus {
-    pub is_running: bool,
-    pub items_processed: u64,
-    pub items_failed: u64,
-    pub total_time_ms: u64,
-    pub throughput_per_second: f64,
-}
+4. 实现一个泛型枚举 `Either<L, R>`，包含 `Left(L)` 和 `Right(R)` 两个变体。为它实现一个方法 `unwrap_left(self) -> L`，如果不是 `Left` 则 panic。
 
-/// 管道错误
-#[derive(Debug, thiserror::Error)]
-pub enum PipelineError {
-    #[error("源数据源错误: {0}")]
-    SourceError(#[source] Box<dyn std::error::Error>),
-    
-    #[error("数据处理器错误: {0}")]
-    ProcessorError(#[source] Box<dyn std::error::Error>),
-    
-    #[error("数据接收器错误: {0}")]
-    SinkError(#[source] Box<dyn std::error::Error>),
-    
-    #[error("任务Join错误")]
-    TaskJoinError,
-    
-    #[error("源数据源无效")]
-    SourceInvalid,
-    
-    #[error("处理器信息无效")]
-    InvalidProcessorInfo,
-    
-    #[error("配置错误: {0}")]
-    ConfigError(String),
-}
-```
+5. 定义一个特征 `Processable`：
+   ```rust
+   trait Processable {
+       type Output;
+       fn process(&self) -> Self::Output;
+   }
+   ```
+   为 `String` 和 `i32` 分别实现该特征（`String` 返回其长度，`i32` 返回其平方）。然后编写一个泛型函数，使用关联类型接收 `Processable` 类型并打印处理结果。
 
-## 5.6 具体实现：CSV数据源
+6. 创建一个 `DataPipeline<T>` 结构体，使用特征对象 `Vec<Box<dyn Processor>>` 存储多个处理器，实现一个支持动态添加处理器的管道系统。
 
-现在让我们实现一个具体的CSV数据源来演示如何使用这些特征。
+#### 高级练习（接近实战）
 
-```rust
-// CSV数据源实现
-use csv::Reader;
-use serde_json::{Value, Map, Number};
-use std::fs::File;
-use std::path::Path;
-use std::io::BufReader;
-use std::io::Read;
+7. 设计一个简单的日志系统：
+   - 定义特征 `Logger`（包含 `log(&self, message: &str)` 方法）。
+   - 实现 `ConsoleLogger` 和 `FileLogger` 两个结构体。
+   - 编写一个泛型函数 `log_all<T: Logger>(loggers: &[T])`（静态分派）和一个使用特征对象的版本 `log_all_dyn(loggers: &[Box<dyn Logger>])`（动态分派）。
+   - 对比两者在性能和灵活性上的差异（可通过基准测试思考）。
 
-/// CSV数据源
-pub struct CsvDataSource {
-    path: PathBuf,
-    delimiter: char,
-    has_header: bool,
-    encoding: String,
-    buffer_size: usize,
-}
+8. 扩展本章的数据处理框架：
+   - 定义 `DataSource` 特征（支持 `read()` 方法，返回 `Vec<u8>`）。
+   - 定义 `DataTransformer<T>` 特征（使用关联类型）。
+   - 定义 `DataSink` 特征（支持 `write()` 方法）。
+   - 使用泛型构建一个 `Pipeline<S: DataSource, T: DataTransformer, K: DataSink>` 结构体，实现端到端的通用数据处理流程。
 
-impl CsvDataSource {
-    /// 创建新的CSV数据源
-    pub fn new<P: Into<PathBuf>>(path: P) -> Self {
-        Self {
-            path: path.into(),
-            delimiter: ',',
-            has_header: true,
-            encoding: "UTF-8".to_string(),
-            buffer_size: 8192,
-        }
-    }
-    
-    /// 设置分隔符
-    pub fn delimiter(mut self, delimiter: char) -> Self {
-        self.delimiter = delimiter;
-        self
-    }
-    
-    /// 设置是否包含标题行
-    pub fn has_header(mut self, has_header: bool) -> Self {
-        self.has_header = has_header;
-        self
-    }
-    
-    /// 设置编码
-    pub fn encoding(mut self, encoding: &str) -> Self {
-        self.encoding = encoding.to_string();
-        self
-    }
-    
-    /// 设置缓冲区大小
-    pub fn buffer_size(mut self, buffer_size: usize) -> Self {
-        self.buffer_size = buffer_size;
-        self
-    }
-}
+---
 
-impl DataSource<Value> for CsvDataSource {
-    type Error = CsvError;
-    
-    fn read(&self) -> Result<Vec<Value>, Self::Error> {
-        // 打开文件
-        let file = File::open(&self.path)
-            .map_err(|e| CsvError::FileOpenError(e))?;
-        
-        // 创建CSV读取器
-        let mut reader = Reader::new(BufReader::new(file))
-            .delimiter(self.delimiter as u8);
-        
-        let mut records = Vec::new();
-        
-        if self.has_header {
-            self.read_with_header(&mut reader, &mut records)?;
-        } else {
-            self.read_without_header(&mut reader, &mut records)?;
-        }
-        
-        Ok(records)
-    }
-    
-    fn read_stream(&self) -> Result<Box<dyn Iterator<Item = Result<Value, Self::Error>>>, Self::Error> {
-        // 创建流式读取器
-        let file = File::open(&self.path)
-            .map_err(|e| CsvError::FileOpenError(e))?;
-        
-        let mut reader = Reader::new(BufReader::new(file))
-            .delimiter(self.delimiter as u8);
-        
-        if self.has_header {
-            let headers = reader.headers()
-                .map_err(|e| CsvError::ReadError(e))?
-                .iter()
-                .map(|h| h.to_string())
-                .collect::<Vec<_>>();
-            
-            Ok(Box::new(CsvRecordIterator {
-                reader: Some(reader),
-                headers: Some(headers),
-                has_header: true,
-                finished: false,
-            }))
-        } else {
-            Ok(Box::new(CsvRecordIterator {
-                reader: Some(reader),
-                headers: None,
-                has_header: false,
-                finished: false,
-            }))
-        }
-    }
-    
-    fn count(&self) -> Result<u64, Self::Error> {
-        let mut count = 0u64;
-        let file = File::open(&self.path)
-            .map_err(|e| CsvError::FileOpenError(e))?;
-        
-        let mut reader = Reader::new(BufReader::new(file))
-            .delimiter(self.delimiter as u8);
-        
-        if self.has_header {
-            // 跳过标题行
-            for _ in reader.records() {
-                count += 1;
-            }
-        } else {
-            for _ in reader.records() {
-                count += 1;
-            }
-        }
-        
-        Ok(count)
-    }
-    
-    fn is_valid(&self) -> bool {
-        self.path.exists() && 
-        self.path.is_file() && 
-        self.path.extension()
-            .map(|ext| ext == "csv" || ext == "tsv")
-            .unwrap_or(false)
-    }
-}
+### 5.15 扩展阅读
 
-impl CsvDataSource {
-    /// 读取带标题的CSV
-    fn read_with_header(
-        &self, 
-        reader: &mut Reader<BufReader<File>>, 
-        records: &mut Vec<Value>
-    ) -> Result<(), CsvError> {
-        // 读取标题行
-        let headers = reader.headers()
-            .map_err(|e| CsvError::ReadError(e))?
-            .iter()
-            .map(|h| h.to_string())
-            .collect::<Vec<_>>();
-        
-        // 读取数据记录
-        for result in reader.records() {
-            let record = result.map_err(|e| CsvError::ReadError(e))?;
-            
-            // 将记录转换为JSON对象
-            let mut obj = Map::new();
-            for (i, field) in record.iter().enumerate() {
-                if i < headers.len() {
-                    // 尝试解析为数字或布尔值
-                    let value = if field == "true" {
-                        Value::Bool(true)
-                    } else if field == "false" {
-                        Value::Bool(false)
-                    } else if let Ok(num) = field.parse::<i64>() {
-                        Value::Number(Number::from(num))
-                    } else if let Ok(num) = field.parse::<f64>() {
-                        Value::Number(Number::from_f64(num).unwrap())
-                    } else {
-                        Value::String(field.to_string())
-                    };
-                    obj.insert(headers[i].clone(), value);
-                }
-            }
-            
-            records.push(Value::Object(obj));
-        }
-        
-        Ok(())
-    }
-    
-    /// 读取无标题的CSV
-    fn read_without_header(
-        &self, 
-        reader: &mut Reader<BufReader<File>>, 
-        records: &mut Vec<Value>
-    ) -> Result<(), CsvError> {
-        for result in reader.records() {
-            let record = result.map_err(|e| CsvError::ReadError(e))?;
-            
-            // 将记录转换为JSON数组
-            let mut array = Vec::new();
-            for field in record.iter() {
-                // 尝试解析为数字或布尔值
-                let value = if field == "true" {
-                    Value::Bool(true)
-                } else if field == "false" {
-                    Value::Bool(false)
-                } else if let Ok(num) = field.parse::<i64>() {
-                    Value::Number(Number::from(num))
-                } else if let Ok(num) = field.parse::<f64>() {
-                    Value::Number(Number::from_f64(num).unwrap())
-                } else {
-                    Value::String(field.to_string())
-                };
-                array.push(value);
-            }
-            
-            records.push(Value::Array(array));
-        }
-        
-        Ok(())
-    }
-}
+为了更深入理解泛型与特征，推荐以下资源：
 
-/// CSV记录迭代器（流式读取）
-struct CsvRecordIterator<R: Read> {
-    reader: Option<Reader<BufReader<R>>>,
-    headers: Option<Vec<String>>,
-    has_header: bool,
-    finished: bool,
-}
-
-impl<R: Read> Iterator for CsvRecordIterator<R> {
-    type Item = Result<Value, CsvError>;
-    
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.finished || self.reader.is_none() {
-            return None;
-        }
-        
-        let reader = self.reader.as_mut()?;
-        let headers = self.headers.as_ref();
-        
-        match reader.records().next() {
-            Some(Ok(record)) => {
-                // 将记录转换为Value
-                if self.has_header {
-                    if let Some(headers) = headers {
-                        let mut obj = Map::new();
-                        for (i, field) in record.iter().enumerate() {
-                            if i < headers.len() {
-                                let value = if field == "true" {
-                                    Value::Bool(true)
-                                } else if field == "false" {
-                                    Value::Bool(false)
-                                } else if let Ok(num) = field.parse::<i64>() {
-                                    Value::Number(Number::from(num))
-                                } else if let Ok(num) = field.parse::<f64>() {
-                                    Value::Number(Number::from_f64(num).unwrap())
-                                } else {
-                                    Value::String(field.to_string())
-                                };
-                                obj.insert(headers[i].clone(), value);
-                            }
-                        }
-                        Some(Ok(Value::Object(obj)))
-                    } else {
-                        Some(Ok(Value::Array(Vec::new())))
-                    }
-                } else {
-                    let mut array = Vec::new();
-                    for field in record.iter() {
-                        let value = if field == "true" {
-                            Value::Bool(true)
-                        } else if field == "false" {
-                            Value::Bool(false)
-                        } else if let Ok(num) = field.parse::<i64>() {
-                            Value::Number(Number::from(num))
-                        } else if let Ok(num) = field.parse::<f64>() {
-                            Value::Number(Number::from_f64(num).unwrap())
-                        } else {
-                            Value::String(field.to_string())
-                        };
-                        array.push(value);
-                    }
-                    Some(Ok(Value::Array(array)))
-                }
-            }
-            Some(Err(e)) => Some(Err(CsvError::ReadError(e))),
-            None => {
-                self.finished = true;
-                self.reader = None;
-                None
-            }
-        }
-    }
-}
-
-/// CSV错误类型
-#[derive(Debug, thiserror::Error)]
-pub enum CsvError {
-    #[error("文件打开错误: {0}")]
-    FileOpenError(std::io::Error),
-    
-    #[error("读取错误: {0}")]
-    ReadError(csv::Error),
-    
-    #[error("编码错误: {0}")]
-    EncodingError(String),
-    
-    #[error("格式错误: {0}")]
-    FormatError(String),
-    
-    #[error("IO错误: {0}")]
-    IoError(#[from] std::io::Error),
-}
-```
-
-## 5.7 数据处理器实现
-
-接下来实现一个数据处理器，用于转换和验证数据。
-
-```rust
-// 数据处理器实现
-use std::collections::HashMap;
-
-/// 数据转换处理器
-pub struct DataTransformProcessor {
-    transformations: Vec<DataTransform>,
-    validations: Vec<DataValidation>,
-    filters: Vec<DataFilter>,
-    config: TransformConfig,
-}
-
-#[derive(Debug, Clone)]
-pub struct TransformConfig {
-    pub fail_on_error: bool,
-    pub continue_on_warning: bool,
-    pub max_errors: usize,
-    pub enable_logging: bool,
-}
-
-impl Default for TransformConfig {
-    fn default() -> Self {
-        Self {
-            fail_on_error: true,
-            continue_on_warning: true,
-            max_errors: 100,
-            enable_logging: true,
-        }
-    }
-}
-
-/// 数据转换操作
-#[derive(Debug, Clone)]
-pub enum DataTransform {
-    /// 字段重命名
-    RenameField { from: String, to: String },
-    /// 字段类型转换
-    ConvertType { field: String, to_type: FieldType },
-    /// 字段计算
-    ComputeField { 
-        target: String, 
-        operation: ComputeOperation 
-    },
-    /// 字段映射
-    MapField { 
-        field: String, 
-        mapping: HashMap<String, String> 
-    },
-    /// 添加常量
-    AddConstant { field: String, value: Value },
-    /// 删除字段
-    RemoveField(String),
-    /// JSON路径操作
-    JsonPath { path: String, operation: JsonPathOperation },
-}
-
-/// 字段类型
-#[derive(Debug, Clone)]
-pub enum FieldType {
-    String,
-    Integer,
-    Float,
-    Boolean,
-    DateTime,
-    Email,
-    Url,
-}
-
-/// 计算操作
-#[derive(Debug, Clone)]
-pub enum ComputeOperation {
-    /// 数值运算
-    Math { operation: MathOperation, operands: Vec<String> },
-    /// 字符串操作
-    String { operation: StringOperation, source_field: String },
-    /// 条件计算
-    Conditional { condition: Condition, then_value: Value, else_value: Option<Value> },
-    /// 聚合操作
-    Aggregate { operation: AggregateOperation, group_by: Vec<String> },
-}
-
-/// 数学运算
-#[derive(Debug, Clone)]
-pub enum MathOperation {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Modulo,
-    Power,
-}
-
-/// 字符串操作
-#[derive(Debug, Clone)]
-pub enum StringOperation {
-    Uppercase,
-    Lowercase,
-    Trim,
-    Replace { from: String, to: String },
-    Substring { start: usize, length: Option<usize> },
-    Length,
-    Contains(String),
-    StartsWith(String),
-    EndsWith(String),
-}
-
-/// 条件
-#[derive(Debug, Clone)]
-pub struct Condition {
-    pub field: String,
-    pub operator: ConditionOperator,
-    pub value: Value,
-}
-
-#[derive(Debug, Clone)]
-pub enum ConditionOperator {
-    Equals,
-    NotEquals,
-    GreaterThan,
-    LessThan,
-    GreaterEqual,
-    LessEqual,
-    Contains,
-    In(Vec<Value>),
-    NotIn(Vec<Value>),
-    IsNull,
-    IsNotNull,
-}
-
-/// 聚合操作
-#[derive(Debug, Clone)]
-pub enum AggregateOperation {
-    Count,
-    Sum,
-    Average,
-    Min,
-    Max,
-}
-
-/// JSON路径操作
-#[derive(Debug, Clone)]
-pub enum JsonPathOperation {
-    Get(String),
-    Set(String, Value),
-    Delete(String),
-    Exists(String),
-}
-
-/// 数据验证规则
-#[derive(Debug, Clone)]
-pub enum DataValidation {
-    Required { fields: Vec<String> },
-    TypeCheck { field: String, expected_type: FieldType },
-    Range { field: String, min: Option<Value>, max: Option<Value> },
-    Pattern { field: String, pattern: String },
-    Unique { field: String },
-    Custom { field: String, rule: String },
-}
-
-/// 数据过滤规则
-#[derive(Debug, Clone)]
-pub enum DataFilter {
-    Include { condition: Condition },
-    Exclude { condition: Condition },
-    FieldPresence { field: String, present: bool },
-}
-
-impl DataTransformProcessor {
-    /// 创建新的转换处理器
-    pub fn new() -> Self {
-        Self {
-            transformations: Vec::new(),
-            validations: Vec::new(),
-            filters: Vec::new(),
-            config: TransformConfig::default(),
-        }
-    }
-    
-    /// 添加转换操作
-    pub fn add_transform(mut self, transform: DataTransform) -> Self {
-        self.transformations.push(transform);
-        self
-    }
-    
-    /// 添加验证规则
-    pub fn add_validation(mut self, validation: DataValidation) -> Self {
-        self.validations.push(validation);
-        self
-    }
-    
-    /// 添加过滤规则
-    pub fn add_filter(mut self, filter: DataFilter) -> Self {
-        self.filters.push(filter);
-        self
-    }
-    
-    /// 设置配置
-    pub fn with_config(mut self, config: TransformConfig) -> Self {
-        self.config = config;
-        self
-    }
-    
-    /// 检查数据是否通过过滤
-    fn passes_filters(&self, data: &Value) -> bool {
-        for filter in &self.filters {
-            if !self.apply_filter(filter, data) {
-                return false;
-            }
-        }
-        true
-    }
-    
-    /// 应用单个过滤器
-    fn apply_filter(&self, filter: &DataFilter, data: &Value) -> bool {
-        match filter {
-            DataFilter::Include { condition } => self.evaluate_condition(condition, data),
-            DataFilter::Exclude { condition } => !self.evaluate_condition(condition, data),
-            DataFilter::FieldPresence { field, present } => {
-                let has_field = self.has_field(data, field);
-                has_field == *present
-            }
-        }
-    }
-    
-    /// 评估条件
-    fn evaluate_condition(&self, condition: &Condition, data: &Value) -> bool {
-        let field_value = self.get_field_value(data, &condition.field);
-        
-        match condition.operator {
-            ConditionOperator::Equals => field_value == Some(condition.value.clone()),
-            ConditionOperator::NotEquals => field_value != Some(condition.value.clone()),
-            ConditionOperator::IsNull => field_value.is_none(),
-            ConditionOperator::IsNotNull => field_value.is_some(),
-            _ => {
-                // 数值比较和其他操作
-                if let (Some(Value::Number(lhs)), Some(Value::Number(rhs))) = (field_value, Some(condition.value.clone())) {
-                    match condition.operator {
-                        ConditionOperator::GreaterThan => lhs.as_f64() > rhs.as_f64(),
-                        ConditionOperator::LessThan => lhs.as_f64() < rhs.as_f64(),
-                        ConditionOperator::GreaterEqual => lhs.as_f64() >= rhs.as_f64(),
-                        ConditionOperator::LessEqual => lhs.as_f64() <= rhs.as_f64(),
-                        _ => false,
-                    }
-                } else {
-                    false
-                }
-            }
-        }
-    }
-    
-    /// 获取字段值
-    fn get_field_value(&self, data: &Value, field: &str) -> Option<Value> {
-        match data {
-            Value::Object(obj) => obj.get(field).cloned(),
-            Value::Array(arr) => {
-                if let Ok(index) = field.parse::<usize>() {
-                    arr.get(index).cloned()
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        }
-    }
-    
-    /// 检查字段是否存在
-    fn has_field(&self, data: &Value, field: &str) -> bool {
-        self.get_field_value(data, field).is_some()
-    }
-    
-    /// 应用所有转换
-    fn apply_transformations(&self, mut data: Value) -> Result<Value, TransformError> {
-        for transform in &self.transformations {
-            data = self.apply_transform(transform, data)?;
-        }
-        Ok(data)
-    }
-    
-    /// 应用单个转换
-    fn apply_transform(&self, transform: &DataTransform, data: Value) -> Result<Value, TransformError> {
-        match transform {
-            DataTransform::RenameField { from, to } => {
-                if let Value::Object(ref mut obj) = data {
-                    if let Some(value) = obj.remove(from) {
-                        obj.insert(to.clone(), value);
-                    }
-                    Ok(data)
-                } else {
-                    Err(TransformError::InvalidOperation("Cannot rename field in non-object data".to_string()))
-                }
-            }
-            
-            DataTransform::ConvertType { field, to_type } => {
-                if let Value::Object(ref mut obj) = data {
-                    if let Some(value) = obj.get_mut(field) {
-                        *value = self.convert_type(value.clone(), to_type)?;
-                    }
-                    Ok(data)
-                } else {
-                    Err(TransformError::InvalidOperation("Cannot convert type in non-object data".to_string()))
-                }
-            }
-            
-            DataTransform::AddConstant { field, value } => {
-                if let Value::Object(ref mut obj) = data {
-                    obj.insert(field.clone(), value.clone());
-                    Ok(data)
-                } else {
-                    Err(TransformError::InvalidOperation("Cannot add constant to non-object data".to_string()))
-                }
-            }
-            
-            DataTransform::RemoveField(field_name) => {
-                if let Value::Object(ref mut obj) = data {
-                    obj.remove(field_name);
-                    Ok(data)
-                } else {
-                    Err(TransformError::InvalidOperation("Cannot remove field from non-object data".to_string()))
-                }
-            }
-            
-            _ => {
-                // 简化实现，其他转换类型
-                Ok(data)
-            }
-        }
-    }
-    
-    /// 类型转换
-    fn convert_type(&self, value: Value, to_type: &FieldType) -> Result<Value, TransformError> {
-        match to_type {
-            FieldType::String => {
-                let string_value = match value {
-                    Value::Number(n) => n.to_string(),
-                    Value::Bool(b) => b.to_string(),
-                    Value::Null => "null".to_string(),
-                    Value::String(s) => s,
-                    Value::Array(_) | Value::Object(_) => {
-                        return Err(TransformError::TypeConversionError("Cannot convert complex type to string".to_string()))
-                    }
-                };
-                Ok(Value::String(string_value))
-            }
-            
-            FieldType::Integer => {
-                match value {
-                    Value::String(s) => {
-                        if let Ok(num) = s.parse::<i64>() {
-                            Ok(Value::Number(serde_json::Number::from(num)))
-                        } else {
-                            Err(TransformError::TypeConversionError("Cannot convert string to integer".to_string()))
-                        }
-                    }
-                    Value::Number(n) => {
-                        if n.is_i64() {
-                            Ok(Value::Number(n))
-                        } else {
-                            Err(TransformError::TypeConversionError("Cannot convert float to integer".to_string()))
-                        }
-                    }
-                    Value::Bool(b) => Ok(Value::Number(serde_json::Number::from(if b { 1 } else { 0 }))),
-                    _ => Err(TransformError::TypeConversionError("Invalid type conversion".to_string())),
-                }
-            }
-            
-            FieldType::Boolean => {
-                match value {
-                    Value::String(s) => Ok(Value::Bool(s.parse::<bool>().unwrap_or(false))),
-                    Value::Number(n) => Ok(Value::Bool(n.as_i64() != Some(0))),
-                    Value::Bool(b) => Ok(Value::Bool(b)),
-                    _ => Err(TransformError::TypeConversionError("Invalid type conversion to boolean".to_string())),
-                }
-            }
-            
-            _ => Ok(value), // 简化实现
-        }
-    }
-}
-
-impl DataProcessor<Value, Value> for DataTransformProcessor {
-    type Error = TransformError;
-    
-    fn process(&self, data: Vec<Value>) -> Result<Vec<Value>, Self::Error> {
-        let mut results = Vec::with_capacity(data.len());
-        let mut error_count = 0;
-        
-        for item in data {
-            // 检查是否通过过滤器
-            if !self.passes_filters(&item) {
-                continue;
-            }
-            
-            // 应用转换
-            match self.apply_transformations(item) {
-                Ok(transformed) => {
-                    results.push(transformed);
-                }
-                Err(e) => {
-                    error_count += 1;
-                    
-                    if self.config.fail_on_error && error_count > self.config.max_errors {
-                        return Err(e);
-                    }
-                    
-                    if self.config.enable_logging {
-                        eprintln!("转换错误: {:?}", e);
-                    }
-                    
-                    if self.config.fail_on_error {
-                        return Err(e);
-                    }
-                }
-            }
-        }
-        
-        Ok(results)
-    }
-    
-    fn process_item(&self, item: Value) -> Result<Value, Self::Error> {
-        if !self.passes_filters(&item) {
-            return Err(TransformError::FilteredOut("Item filtered out".to_string()));
-        }
-        
-        self.apply_transformations(item)
-    }
-    
-    fn process_stream(&self, stream: Box<dyn Iterator<Item = Value>>) -> Result<Box<dyn Iterator<Item = Result<Value, Self::Error>>>, Self::Error> {
-        let processor = self.clone();
-        let config = self.config.clone();
-        
-        Ok(Box::new(stream.map(move |item| {
-            if !processor.passes_filters(&item) {
-                return Ok(item); // 保留原始数据或根据需求过滤
-            }
-            
-            match processor.apply_transformations(item) {
-                Ok(transformed) => Ok(transformed),
-                Err(e) => {
-                    if config.fail_on_error {
-                        Err(e)
-                    } else {
-                        Ok(item) // 返回原始数据
-                    }
-                }
-            }
-        })))
-    }
-    
-    fn info(&self) -> ProcessorInfo {
-        ProcessorInfo {
-            name: "DataTransformProcessor".to_string(),
-            version: "1.0.0".to_string(),
-            description: "数据转换和验证处理器".to_string(),
-            input_type: "serde_json::Value".to_string(),
-            output_type: "serde_json::Value".to_string(),
-            performance_metrics: PerformanceMetrics {
-                processing_time_ms: 0,
-                throughput_items_per_second: 0.0,
-                memory_usage_mb: 0.0,
-            },
-        }
-    }
-}
-
-/// 转换错误
-#[derive(Debug, thiserror::Error)]
-pub enum TransformError {
-    #[error("类型转换错误: {0}")]
-    TypeConversionError(String),
-    
-    #[error("无效操作: {0}")]
-    InvalidOperation(String),
-    
-    #[error("验证错误: {0}")]
-    ValidationError(String),
-    
-    #[error("字段错误: {0}")]
-    FieldError(String),
-    
-    #[error("被过滤: {0}")]
-    FilteredOut(String),
-    
-    #[error("处理错误: {0}")]
-    ProcessingError(String),
-}
-```
-
-## 5.8 数据输出实现
-
-现在实现一个文件输出处理器：
-
-```rust
-// 数据输出实现
-use serde_json::{Value, Map, Number};
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
-
-/// JSON文件输出处理器
-pub struct JsonFileSink {
-    path: PathBuf,
-    format: OutputFormat,
-    config: OutputConfig,
-    stats: SinkStats,
-    buffer: Vec<Value>,
-    buffer_size: usize,
-}
-
-#[derive(Debug, Clone)]
-pub enum OutputFormat {
-    /// 标准JSON格式
-    Json {
-        pretty: bool,
-        pretty_indent: usize,
-    },
-    /// NDJSON (每行一个JSON对象)
-    Ndjson,
-    /// 压缩JSON
-    JsonCompressed {
-        compression: CompressionType,
-    },
-    /// CSV格式
-    Csv {
-        delimiter: char,
-        has_header: bool,
-        include_nulls: bool,
-    },
-}
-
-#[derive(Debug, Clone)]
-pub enum CompressionType {
-    None,
-    Gzip,
-    Zstd,
-    Bzip2,
-}
-
-#[derive(Debug, Clone)]
-pub struct OutputConfig {
-    pub buffer_size: usize,
-    pub auto_flush: bool,
-    pub create_dirs: bool,
-    pub overwrite_existing: bool,
-    pub encoding: String,
-}
-
-impl Default for OutputConfig {
-    fn default() -> Self {
-        Self {
-            buffer_size: 1000,
-            auto_flush: true,
-            create_dirs: true,
-            overwrite_existing: false,
-            encoding: "UTF-8".to_string(),
-        }
-    }
-}
-
-impl JsonFileSink {
-    /// 创建新的JSON文件输出
-    pub fn new<P: Into<PathBuf>>(path: P) -> Self {
-        Self {
-            path: path.into(),
-            format: OutputFormat::Json { pretty: true, pretty_indent: 2 },
-            config: OutputConfig::default(),
-            stats: SinkStats {
-                total_written: 0,
-                write_time_ms: 0,
-                last_write: None,
-            },
-            buffer: Vec::new(),
-            buffer_size: 0,
-        }
-    }
-    
-    /// 设置输出格式
-    pub fn format(mut self, format: OutputFormat) -> Self {
-        self.format = format;
-        self
-    }
-    
-    /// 设置配置
-    pub fn with_config(mut self, config: OutputConfig) -> Self {
-        self.config = config;
-        self
-    }
-    
-    /// 创建目录
-    fn create_directories(&self) -> Result<(), SinkError> {
-        if let Some(parent) = self.path.parent() {
-            if !parent.exists() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| SinkError::IoError(e))?;
-            }
-        }
-        Ok(())
-    }
-    
-    /// 打开文件（如果需要的话）
-    fn open_file(&self) -> Result<File, SinkError> {
-        let file = if self.config.overwrite_existing {
-            File::create(&self.path)
-        } else {
-            File::options()
-                .write(true)
-                .create_new(true)
-                .open(&self.path)
-        };
-        
-        file.map_err(|e| SinkError::FileOpenError(e))
-    }
-    
-    /// 写入单个记录
-    fn write_record(&mut self, record: &Value) -> Result<(), SinkError> {
-        let start_time = std::time::Instant::now();
-        
-        // 格式化数据
-        let formatted = match &self.format {
-            OutputFormat::Json { pretty, indent } => {
-                if *pretty {
-                    serde_json::to_string_pretty(record)
-                } else {
-                    serde_json::to_string(record)
-                }
-                .map_err(|e| SinkError::SerializationError(e))?
-            }
-            OutputFormat::Ndjson => {
-                serde_json::to_string(record)
-                    .map_err(|e| SinkError::SerializationError(e))?
-            }
-            OutputFormat::JsonCompressed { .. } => {
-                // 简化实现，实际应该压缩
-                serde_json::to_string(record)
-                    .map_err(|e| SinkError::SerializationError(e))?
-            }
-            OutputFormat::Csv { .. } => {
-                self.convert_to_csv_line(record)?
-            }
-        };
-        
-        // 写入文件（这里简化实现，实际应该保持文件句柄）
-        let mut file = self.open_file()?;
-        writeln!(file, "{}", formatted)
-            .map_err(|e| SinkError::WriteError(e))?;
-        
-        // 更新统计
-        self.stats.total_written += 1;
-        self.stats.write_time_ms += start_time.elapsed().as_millis() as u64;
-        self.stats.last_write = Some(std::time::SystemTime::now());
-        
-        Ok(())
-    }
-    
-    /// 转换为CSV行
-    fn convert_to_csv_line(&self, record: &Value) -> Result<String, SinkError> {
-        match record {
-            Value::Object(obj) => {
-                // 对象转换为CSV行
-                let mut values = Vec::new();
-                for (_, value) in obj {
-                    let csv_value = match value {
-                        Value::Null => "".to_string(),
-                        Value::String(s) => s.clone(),
-                        Value::Number(n) => n.to_string(),
-                        Value::Bool(b) => b.to_string(),
-                        Value::Array(_) | Value::Object(_) => {
-                            return Err(SinkError::ConversionError("Complex types not supported in CSV".to_string()))
-                        }
-                    };
-                    values.push(csv_value);
-                }
-                Ok(values.join(","))
-            }
-            Value::Array(arr) => {
-                // 数组直接转换为CSV行
-                let mut values = Vec::new();
-                for value in arr {
-                    let csv_value = match value {
-                        Value::Null => "".to_string(),
-                        Value::String(s) => s.clone(),
-                        Value::Number(n) => n.to_string(),
-                        Value::Bool(b) => b.to_string(),
-                        Value::Array(_) | Value::Object(_) => {
-                            return Err(SinkError::ConversionError("Complex types not supported in CSV".to_string()))
-                        }
-                    };
-                    values.push(csv_value);
-                }
-                Ok(values.join(","))
-            }
-            _ => {
-                Err(SinkError::ConversionError("Record is not object or array".to_string()))
-            }
-        }
-    }
-    
-    /// 刷新缓冲区
-    fn flush_buffer(&mut self) -> Result<(), SinkError> {
-        if self.buffer.is_empty() {
-            return Ok(());
-        }
-        
-        // 批量写入
-        for record in &self.buffer {
-            self.write_record(record)?;
-        }
-        
-        self.buffer.clear();
-        self.buffer_size = 0;
-        
-        Ok(())
-    }
-}
-
-impl DataSink<Value> for JsonFileSink {
-    type Error = SinkError;
-    
-    fn write(&mut self, data: Vec<Value>) -> Result<(), Self::Error> {
-        // 创建目录
-        if self.config.create_dirs {
-            self.create_directories()?;
-        }
-        
-        for record in data {
-            if self.config.buffer_size > 0 {
-                // 使用缓冲区
-                self.buffer.push(record);
-                self.buffer_size += 1;
-                
-                if self.buffer_size >= self.config.buffer_size || self.config.auto_flush {
-                    self.flush_buffer()?;
-                }
-            } else {
-                // 直接写入
-                self.write_record(&record)?;
-            }
-        }
-        
-        Ok(())
-    }
-    
-    fn write_stream(&mut self, stream: Box<dyn Iterator<Item = Value>>) -> Result<(), Self::Error> {
-        // 创建目录
-        if self.config.create_dirs {
-            self.create_directories()?;
-        }
-        
-        for record in stream {
-            if self.config.buffer_size > 0 {
-                self.buffer.push(record);
-                self.buffer_size += 1;
-                
-                if self.buffer_size >= self.config.buffer_size || self.config.auto_flush {
-                    self.flush_buffer()?;
-                }
-            } else {
-                self.write_record(&record)?;
-            }
-        }
-        
-        Ok(())
-    }
-    
-    fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush_buffer()?;
-        
-        // 这里可以刷新底层的文件句柄
-        // 简化实现中我们已经在每次写入时刷新了
-        Ok(())
-    }
-    
-    fn stats(&self) -> SinkStats {
-        self.stats.clone()
-    }
-}
-
-/// 接收器错误
-#[derive(Debug, thiserror::Error)]
-pub enum SinkError {
-    #[error("文件打开错误: {0}")]
-    FileOpenError(std::io::Error),
-    
-    #[error("写入错误: {0}")]
-    WriteError(std::io::Error),
-    
-    #[error("序列化错误: {0}")]
-    SerializationError(#[from] serde_json::Error),
-    
-    #[error("IO错误: {0}")]
-    IoError(std::io::Error),
-    
-    #[error("转换错误: {0}")]
-    ConversionError(String),
-    
-    #[error("配置错误: {0}")]
-    ConfigError(String),
-}
-```
-
-## 5.9 完整的示例程序
-
-现在让我们创建一个完整的示例程序来展示整个数据流框架的使用：
-
-```rust
-// 主程序示例
-use dataflow_framework::prelude::*;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("=== 数据流框架示例 ===\n");
-    
-    // 1. 创建数据源（CSV文件）
-    println!("1. 创建CSV数据源");
-    let source = CsvDataSource::new("data/sample.csv")
-        .has_header(true)
-        .delimiter(',');
-    
-    // 2. 创建数据处理器
-    println!("2. 创建数据转换处理器");
-    let mut transforms = Vec::new();
-    
-    // 添加字段重命名
-    transforms.push(DataTransform::RenameField { 
-        from: "name".to_string(), 
-        to: "full_name".to_string() 
-    });
-    
-    // 添加类型转换
-    transforms.push(DataTransform::ConvertType { 
-        field: "age".to_string(), 
-        to_type: FieldType::Integer 
-    });
-    
-    // 添加常量字段
-    transforms.push(DataTransform::AddConstant { 
-        field: "source".to_string(), 
-        Value::String("csv_import".to_string()) 
-    });
-    
-    // 添加验证
-    let mut validations = Vec::new();
-    validations.push(DataValidation::Required { 
-        fields: vec!["name".to_string(), "age".to_string()] 
-    });
-    
-    // 添加过滤
-    let mut filters = Vec::new();
-    filters.push(DataFilter::Include { 
-        condition: Condition {
-            field: "age".to_string(),
-            operator: ConditionOperator::GreaterEqual,
-            value: Value::Number(Number::from(18)),
-        }
-    });
-    
-    let processor = DataTransformProcessor::new()
-        .add_transforms(transforms)
-        .add_validations(validations)
-        .add_filters(filters);
-    
-    // 3. 创建数据接收器
-    println!("3. 创建JSON文件输出");
-    let output_format = OutputFormat::Json { 
-        pretty: true, 
-        pretty_indent: 2 
-    };
-    
-    let output_config = OutputConfig {
-        buffer_size: 100,
-        auto_flush: true,
-        create_dirs: true,
-        overwrite_existing: true,
-        encoding: "UTF-8".to_string(),
-    };
-    
-    let sink = JsonFileSink::new("output/processed_data.json")
-        .format(output_format)
-        .with_config(output_config);
-    
-    // 4. 创建数据管道
-    println!("4. 创建数据处理管道");
-    let pipeline_config = PipelineConfig {
-        batch_size: 50,
-        parallel_processing: false,  // 示例中关闭并行处理
-        max_concurrency: 4,
-        enable_cache: true,
-        cache_ttl_seconds: 3600,
-        retry_attempts: 3,
-        timeout_seconds: 300,
-    };
-    
-    let mut pipeline = DataPipeline::with_config(source, processor, sink, pipeline_config);
-    
-    // 5. 运行管道
-    println!("5. 开始处理数据...\n");
-    let start_time = std::time::Instant::now();
-    
-    let metrics = pipeline.run().await?;
-    
-    let total_time = start_time.elapsed();
-    
-    // 6. 显示结果
-    println!("\n=== 处理完成 ===");
-    println!("总处理时间: {:?}", total_time);
-    println!("处理的数据项数: {}", metrics.items_processed);
-    println!("失败的数据项数: {}", metrics.items_failed);
-    println!("处理吞吐量: {:.2} 项/秒", 
-             metrics.items_processed as f64 / total_time.as_secs_f64());
-    
-    if metrics.items_failed > 0 {
-        println!("警告: 有 {} 项数据处理失败", metrics.items_failed);
-    }
-    
-    // 7. 获取管道状态
-    let status = pipeline.get_status();
-    println!("\n=== 管道状态 ===");
-    println!("是否运行中: {}", status.is_running);
-    println!("吞吐量: {:.2} 项/秒", status.throughput_per_second);
-    
-    Ok(())
-}
-
-// 为DataTransformProcessor添加方便的方法
-trait DataTransformProcessorBuilder {
-    fn add_transforms(self, transforms: Vec<DataTransform>) -> Self;
-    fn add_validations(self, validations: Vec<DataValidation>) -> Self;
-    fn add_filters(self, filters: Vec<DataFilter>) -> Self;
-}
-
-impl DataTransformProcessorBuilder for DataTransformProcessor {
-    fn add_transforms(mut self, transforms: Vec<DataTransform>) -> Self {
-        for transform in transforms {
-            self = self.add_transform(transform);
-        }
-        self
-    }
-    
-    fn add_validations(mut self, validations: Vec<DataValidation>) -> Self {
-        for validation in validations {
-            self = self.add_validation(validation);
-        }
-        self
-    }
-    
-    fn add_filters(mut self, filters: Vec<DataFilter>) -> Self {
-        for filter in filters {
-            self = self.add_filter(filter);
-        }
-        self
-    }
-}
-```
-
-## 5.10 测试代码
-
-让我们为框架创建全面的测试：
-
-```rust
-// 测试代码
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::NamedTempFile;
-    use std::io::Write;
-    use serde_json::{json, Value};
-
-    #[test]
-    fn test_csv_data_source() {
-        // 创建临时CSV文件
-        let mut temp_file = NamedTempFile::new().unwrap();
-        writeln!(temp_file, "name,age,city").unwrap();
-        writeln!(temp_file, "Alice,25,New York").unwrap();
-        writeln!(temp_file, "Bob,30,Los Angeles").unwrap();
-        temp_file.flush().unwrap();
-        
-        // 测试CSV数据源
-        let source = CsvDataSource::new(temp_file.path())
-            .has_header(true);
-        
-        let data = source.read().unwrap();
-        
-        assert_eq!(data.len(), 2);
-        assert_eq!(data[0]["name"], "Alice");
-        assert_eq!(data[0]["age"], 25);
-        assert_eq!(data[0]["city"], "New York");
-    }
-    
-    #[test]
-    fn test_data_transform_processor() {
-        let processor = DataTransformProcessor::new()
-            .add_transform(DataTransform::RenameField {
-                from: "name".to_string(),
-                to: "full_name".to_string(),
-            })
-            .add_transform(DataTransform::AddConstant {
-                field: "source".to_string(),
-                Value::String("test".to_string()),
-            });
-        
-        let input_data = vec![
-            json!({
-                "name": "Alice",
-                "age": 25
-            }),
-            json!({
-                "name": "Bob",
-                "age": 30
-            }),
-        ];
-        
-        let result = processor.process(input_data).unwrap();
-        
-        assert_eq!(result.len(), 2);
-        assert_eq!(result[0]["full_name"], "Alice");
-        assert_eq!(result[0]["source"], "test");
-        assert_eq!(result[1]["full_name"], "Bob");
-        assert_eq!(result[1]["source"], "test");
-    }
-    
-    #[test]
-    fn test_data_filters() {
-        let processor = DataTransformProcessor::new()
-            .add_filter(DataFilter::Include {
-                condition: Condition {
-                    field: "age".to_string(),
-                    operator: ConditionOperator::GreaterEqual,
-                    value: json!(25),
-                }
-            });
-        
-        let input_data = vec![
-            json!({"name": "Alice", "age": 25}),
-            json!({"name": "Bob", "age": 20}),
-            json!({"name": "Carol", "age": 30}),
-        ];
-        
-        let result = processor.process(input_data).unwrap();
-        
-        // 应该过滤掉Bob（age < 25）
-        assert_eq!(result.len(), 2);
-        assert_eq!(result[0]["name"], "Alice");
-        assert_eq!(result[1]["name"], "Carol");
-    }
-    
-    #[test]
-    fn test_type_conversion() {
-        let processor = DataTransformProcessor::new()
-            .add_transform(DataTransform::ConvertType {
-                field: "age".to_string(),
-                to_type: FieldType::Integer,
-            });
-        
-        let input_data = vec![json!({"age": "25"})];
-        
-        let result = processor.process(input_data).unwrap();
-        
-        assert_eq!(result[0]["age"], 25);
-    }
-    
-    #[test]
-    fn test_json_file_sink() {
-        // 创建临时文件
-        let temp_file = NamedTempFile::new().unwrap();
-        let path = temp_file.path().to_path_buf();
-        drop(temp_file); // 关闭文件句柄
-        
-        let mut sink = JsonFileSink::new(path.clone())
-            .format(OutputFormat::Json { pretty: true, pretty_indent: 2 });
-        
-        let data = vec![
-            json!({"name": "Alice", "age": 25}),
-            json!({"name": "Bob", "age": 30}),
-        ];
-        
-        sink.write(data).unwrap();
-        sink.flush().unwrap();
-        
-        // 验证输出文件
-        let content = std::fs::read_to_string(path).unwrap();
-        assert!(content.contains("Alice"));
-        assert!(content.contains("Bob"));
-        assert!(content.contains("25"));
-    }
-    
-    #[test]
-    fn test_data_pipeline() {
-        // 简化测试：使用内存数据源
-        struct MemoryDataSource {
-            data: Vec<Value>,
-        }
-        
-        impl MemoryDataSource {
-            fn new(data: Vec<Value>) -> Self {
-                Self { data }
-            }
-        }
-        
-        impl DataSource<Value> for MemoryDataSource {
-            type Error = Box<dyn std::error::Error>;
-            
-            fn read(&self) -> Result<Vec<Value>, Self::Error> {
-                Ok(self.data.clone())
-            }
-            
-            fn read_stream(&self) -> Result<Box<dyn Iterator<Item = Result<Value, Self::Error>>>, Self::Error> {
-                let data = self.data.clone();
-                Ok(Box::new(data.into_iter().map(Ok)))
-            }
-            
-            fn count(&self) -> Result<u64, Self::Error> {
-                Ok(self.data.len() as u64)
-            }
-            
-            fn is_valid(&self) -> bool {
-                !self.data.is_empty()
-            }
-        }
-        
-        let source = MemoryDataSource::new(vec![
-            json!({"name": "Alice", "age": 25}),
-            json!({"name": "Bob", "age": 30}),
-        ]);
-        
-        let processor = DataTransformProcessor::new()
-            .add_transform(DataTransform::AddConstant {
-                field: "processed".to_string(),
-                Value::Bool(true),
-            });
-        
-        let temp_file = NamedTempFile::new().unwrap();
-        let path = temp_file.path().to_path_buf();
-        drop(temp_file);
-        
-        let sink = JsonFileSink::new(path);
-        
-        let pipeline = DataPipeline::new(source, processor, sink);
-        let status = pipeline.get_status();
-        
-        assert_eq!(status.items_processed, 0); // 管道还没运行
-    }
-    
-    #[test]
-    fn test_error_handling() {
-        let processor = DataTransformProcessor::new()
-            .with_config(TransformConfig {
-                fail_on_error: true,
-                continue_on_warning: true,
-                max_errors: 1,
-                enable_logging: false,
-            });
-        
-        // 无效的转换（尝试重命名字段但数据不是对象）
-        let input_data = vec![json!(42)]; // 数字不是对象
-        
-        let result = processor.process(input_data);
-        
-        // 应该返回错误
-        assert!(result.is_err());
-    }
-}
-```
-
-## 5.11 性能优化技巧
-
-在企业级应用中，性能是关键考虑因素。以下是一些优化数据流框架性能的方法：
-
-### 5.11.1 内存管理优化
-
-```rust
-// 内存优化的数据处理
-pub struct StreamingDataProcessor<T> {
-    buffer_size: usize,
-    _phantom: std::marker::PhantomData<T>,
-}
-
-impl<T> StreamingDataProcessor<T> {
-    pub fn new(buffer_size: usize) -> Self {
-        Self {
-            buffer_size,
-            _phantom: std::marker::PhantomData,
-        }
-    }
-    
-    /// 流式处理大量数据
-    pub async fn process_stream<'a, S, P>(
-        &'a self,
-        source: S,
-        processor: P,
-    ) -> Result<StreamingStats, Box<dyn std::error::Error + Send + Sync>>
-    where
-        S: futures::stream::Stream<Item = Result<T, Box<dyn std::error::Error + Send + Sync>>>,
-        P: Fn(&[T]) -> Result<Vec<T>, Box<dyn std::error::Error + Send + Sync>> + Send + Sync,
-        T: Send + Sync + 'a,
-    {
-        let mut buffer = Vec::with_capacity(self.buffer_size);
-        let mut output = Vec::new();
-        let mut stats = StreamingStats::default();
-        
-        // 使用异步流处理
-        let mut stream = source.fuse();
-        
-        while let Some(item_result) = stream.next().await {
-            let item = item_result?;
-            
-            buffer.push(item);
-            stats.input_count += 1;
-            
-            // 当缓冲区满时处理
-            if buffer.len() >= self.buffer_size {
-                let processed_batch = processor(&buffer)?;
-                output.extend(processed_batch);
-                stats.output_count += processed_batch.len() as u64;
-                buffer.clear();
-                
-                // 强制释放内存
-                if buffer.capacity() > self.buffer_size * 2 {
-                    buffer.shrink_to_fit();
-                }
-            }
-        }
-        
-        // 处理剩余数据
-        if !buffer.is_empty() {
-            let processed_batch = processor(&buffer)?;
-            output.extend(processed_batch);
-            stats.output_count += processed_batch.len() as u64;
-        }
-        
-        Ok(stats)
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct StreamingStats {
-    pub input_count: u64,
-    pub output_count: u64,
-    pub processing_time_ms: u64,
-    pub memory_peak_mb: f64,
-}
-```
-
-### 5.11.2 并发优化
-
-```rust
-// 并发数据处理
-use rayon::prelude::*;
-
-pub struct ParallelDataProcessor {
-    chunk_size: usize,
-    worker_threads: usize,
-}
-
-impl ParallelDataProcessor {
-    pub fn new(chunk_size: usize, worker_threads: usize) -> Self {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(worker_threads)
-            .build_global()
-            .ok();
-            
-        Self { chunk_size, worker_threads }
-    }
-    
-    /// 并行处理数据
-    pub fn process_parallel<T, P, R>(
-        &self,
-        data: &[T],
-        processor: P,
-    ) -> Result<Vec<R>, Box<dyn std::error::Error + Send + Sync>>
-    where
-        T: Send + Sync,
-        R: Send + Sync,
-        P: Fn(&[T]) -> Result<Vec<R>, Box<dyn std::error::Error + Send + Sync>> + Send + Sync + Clone,
-    {
-        // 将数据分块
-        let chunks: Vec<_> = data.chunks(self.chunk_size).collect();
-        
-        // 并行处理每个块
-        let results: Vec<_> = chunks
-            .par_iter()
-            .map(|chunk| {
-                let processed = processor(chunk)?;
-                Ok(processed)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        
-        // 合并结果
-        let mut output = Vec::new();
-        for result_chunk in results {
-            output.extend(result_chunk);
-        }
-        
-        Ok(output)
-    }
-}
-```
-
-## 5.12 总结
-
-在本章中，我们深入学习了Rust的泛型和特征，并构建了一个完整
+1. **官方文档（强烈推荐）**
+   - [The Rust Book - Generics](https://doc.rust-lang.org/book/ch10-00-generics.html)
+   - [The Rust Book - Traits](https://doc.rust-lang.org/book/ch10-02-traits.html)
+   - [The Rust Reference - Trait Objects](https://doc.rust-lang.org/reference/types/trait-object.html)
