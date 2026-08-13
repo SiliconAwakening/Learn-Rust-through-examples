@@ -1,552 +1,215 @@
-# Chapter 5: Generics and Traits
+# Chapter 5: Generics & Traits
 
-## 5.1 Chapter Overview
+Generics and traits are Rust's most important abstraction mechanisms: generics let you write one piece of code for many types, and traits define what a type can do. Together they yield code that is both flexible and type-safe — and, thanks to monomorphization, with zero runtime overhead.
 
-Generics and Traits are among the most important abstraction mechanisms in the Rust programming language. They allow us to write flexible yet type-safe code by abstracting common algorithms and data structures without having to duplicate code for every concrete type.
+## Learning Objectives
 
-### Learning Objectives
+- Write type-agnostic code with generic functions and structs.
+- Define and implement traits, and understand default methods.
+- Constrain generic types with trait bounds.
+- Distinguish static dispatch (generics) from dynamic dispatch (trait objects).
+- Design interfaces that fit a domain using associated types.
 
-After completing this chapter, you will be able to:
+---
 
-- Understand the basic concepts and syntax of generics
-- Master the definition, implementation, and usage of traits
-- Learn trait bounds and generic constraints
-- Understand trait objects and dynamic dispatch
-- Grasp associated types and generic associated types
-- Learn how to design extensible architectures using generics and traits
+## 5.1 Generics
 
-## 5.2 Generics Fundamentals
-
-### 5.2.1 What Are Generics?
-
-In Rust’s macro and generics system, generics (Generics) are the core foundation for building zero-copy, type-safe, and high-performance programs. If Rust libraries are “building blocks,” then generics give these blocks the power of “universal molds.”
-
-**The Essence of Rust Generics:**
-
-It allows you to define structures and functions “with type parameters.” The compiler handles the types for you — you only need to define the logic.
-
-> **Simple Analogy:**
-> - Generics are like a “universal box.”
-> - Without generics: You need one box for “apples” and another box for “pears.”
-> - With generics: You only need to make one “box,” tell it “this box can hold apples or pears,” and declare that the content is of type `T`. The Rust compiler ensures that whatever you put in is always valid.
-
-Rust generics mainly consist of two parts: **Type Parameters** and **Associated Types**. Beginners primarily focus on the former.
+A generic uses a placeholder type `T` in place of a concrete type, filled in at the call site. A single `largest` works for any slice of comparable items:
 
 ```rust
-// Define a struct where T represents any type
-struct Box<T> {
-    data: T,          // T is the type parameter
-    capacity: usize,
+fn largest<T: PartialOrd>(list: &[T]) -> &T {
+    let mut biggest = &list[0];
+    for item in &list[1..] {
+        if item > biggest {
+            biggest = item;
+        }
+    }
+    biggest
 }
 
-// Using the generic struct
-let my_box_int = Box { data: 10, capacity: 5 };
-let my_box_str = Box { data: "Hello".to_string(), capacity: 5 };
+fn main() {
+    let nums = vec![3, 1, 4, 1, 5, 9, 2, 6];
+    println!("largest: {}", largest(&nums));
 
-// The compiler ensures the data field matches the declared type
+    let chars = vec!['a', 'z', 'm'];
+    println!("largest: {}", largest(&chars));
+}
 ```
 
-### 5.2.2 Generic Functions
-
-Let’s start with a simple generic function:
+### Generic structs & enums
 
 ```rust
-// Generic function example
-fn compare<T>(a: T, b: T) -> i32 
+struct Pair<T> {
+    first: T,
+    second: T,
+}
+
+impl<T> Pair<T> {
+    fn new(first: T, second: T) -> Self {
+        Pair { first, second }
+    }
+}
+
+fn main() {
+    let p = Pair::new(1, 2);
+    println!("{} {}", p.first, p.second);
+}
+```
+
+`Option<T>`, `Result<T, E>`, and `Vec<T>` are themselves generic enums/structs.
+
+> **Zero cost**: generics are **monomorphized** at compile time — the compiler generates a dedicated copy for each concrete type. `largest::<i32>` and `largest::<char>` are two separate functions, each inlinable, with no dispatch overhead at runtime.
+
+---
+
+## 5.2 Traits: What a Type Can Do
+
+A trait defines a set of method signatures; a type provides an implementation with `impl`, declaring "I can do these things":
+
+```rust
+trait Summary {
+    fn summarize(&self) -> String;
+
+    // Default method — implementers may skip it
+    fn preview(&self) -> String {
+        let s = self.summarize();
+        let n = s.len().min(20);
+        format!("{}...", &s[..n])
+    }
+}
+
+struct Article {
+    title: String,
+    content: String,
+}
+
+impl Summary for Article {
+    fn summarize(&self) -> String {
+        format!("{}: {}", self.title, self.content)
+    }
+}
+
+fn main() {
+    let a = Article {
+        title: "Rust released".into(),
+        content: "Rust 2021 edition is stable".into(),
+    };
+    println!("{}", a.summarize());
+    println!("{}", a.preview()); // default implementation
+}
+```
+
+Traits can have default implementations that implementers override as needed.
+
+---
+
+## 5.3 Trait Bounds: Constraining Generics
+
+A generic `T` can do almost nothing by default. To call its methods, declare the traits it must implement with a **trait bound**:
+
+```rust
+// T: Summary + Display — T must implement both
+fn report<T: Summary>(item: &T) {
+    println!("report: {}", item.summarize());
+}
+```
+
+### `where` clauses
+
+With many bounds, a `where` clause is clearer:
+
+```rust
+fn merge<T, U>(a: &T, b: &U) -> String
 where
-    T: PartialOrd,
+    T: Summary,
+    U: Summary,
 {
-    if a < b {
-        -1
-    } else if a > b {
-        1
-    } else {
-        0
-    }
+    format!("{} | {}", a.summarize(), b.summarize())
 }
+```
 
-// Using the generic function
+### `impl Trait` syntax
+
+Parameters and return values can use `impl Trait` as shorthand:
+
+```rust
+// Parameter: accept any type implementing Summary
+fn report(item: &impl Summary) { /* ... */ }
+
+// Return: return some type implementing Summary (caller need not know which)
+fn make() -> impl Summary {
+    Article { title: "x".into(), content: "y".into() }
+}
+```
+
+> **Returning `impl Trait`**: you may return only a single concrete type. To return one of several types, use a trait object (next section).
+
+---
+
+## 5.4 Static vs Dynamic Dispatch
+
+Generics with trait bounds are **static dispatch**: monomorphized at compile time, one copy per concrete type, calls are direct and inlinable. The trade-off is slightly larger binaries.
+
+When you need to hold values of "several different types" at runtime (e.g. a `Vec` of various `Summary`), use **dynamic dispatch** — a trait object:
+
+```rust
 fn main() {
-    println!("Integer comparison: {}", compare(5, 3));     // Output: 1
-    println!("Float comparison: {}", compare(3.14, 2.71)); // Output: 1
-    println!("String comparison: {}", compare("abc", "xyz")); // Output: -1
-}
-```
-
-In the example above:
-- `T` is the type parameter, meaning the function can work with any type
-- `where T: PartialOrd` is a trait bound that requires `T` to implement the `PartialOrd` trait
-- This allows the function to work with all types that support comparison operators
-
-### 5.2.3 Generic Structs
-
-If generics are the “skeleton” of Rust, then generic structs and generic enums are the two most essential building blocks of that skeleton. Mastering these two will allow you to write flexible and type-safe code like `Vec`, `Option`, etc.
-
-Imagine building a house.
-
-> **Without generics**: To build a “villa,” you need a specific blueprint; to build an “apartment,” you need another.
-> **With generics**: You design a “modular template.” By changing the “brick type” (`T`) inside the template, it can become either a villa or an apartment.
-
-In Rust, generic structs allow you to declare a “type variable” (usually `T`) when defining the struct, enabling it to encapsulate any type.
-
-The most powerful feature of generic structs is that you can define generic methods for them using `impl<T>`.
-
-```rust
-// Generic struct
-#[derive(Debug, Clone)]
-struct Container<T> {
-    items: Vec<T>,
-    capacity: usize,
-}
-
-impl<T> Container<T> {
-    fn new(capacity: usize) -> Self {
-        Self {
-            items: Vec::with_capacity(capacity),
-            capacity,
-        }
-    }
-    
-    fn push(&mut self, item: T) {
-        if self.items.len() < self.capacity {
-            self.items.push(item);
-        }
-    }
-    
-    fn get(&self, index: usize) -> Option<&T> {
-        self.items.get(index)
-    }
-    
-    fn len(&self) -> usize {
-        self.items.len()
-    }
-}
-
-// Generic method with trait bound
-impl<T: std::fmt::Display> Container<T> {
-    fn print_all(&self) {
-        for item in &self.items {
-            println!("{}", item);
-        }
-    }
-}
-
-fn main() {
-    let mut int_container = Container::new(3);
-    int_container.push(1);
-    int_container.push(2);
-    int_container.push(3);
-    
-    println!("Integer container: {:?}", int_container.items);
-    println!("Container size: {}", int_container.len());
-    
-    let mut string_container = Container::new(2);
-    string_container.push("hello");
-    string_container.push("world");
-    string_container.print_all();  // Requires Display trait
-}
-```
-
-> **⚠️ Important Notes**:
-> - The `T` in generic methods must match the struct’s `T`.
-> - Rust does not allow calling methods directly on `Pair<T>` like in Java; you must implement them explicitly in an `impl` block.
-
-### 5.2.4 Generic Enums
-
-Enums are Rust’s best way to define “multiple possible states.”
-
-- **Non-generic**: `enum Status { Active, Disabled }`
-- **Generic**: `enum Status<T> { Active, Disabled }` — here the meaning of `Active` and `Disabled` can depend on type `T`.
-
-The most common generic enums are `Option<T>` and `Result<T, E>`.
-
-#### 🛠 Definition and Usage
-
-```rust
-// Generic enum example
-#[derive(Debug, Clone)]
-enum Result<T, E> {
-    Ok(T),
-    Err(E),
-}
-
-#[derive(Debug, Clone)]
-enum Option<T> {
-    Some(T),
-    None,
-}
-
-// Utility methods
-impl<T, E> Result<T, E> {
-    fn is_ok(&self) -> bool {
-        matches!(self, Result::Ok(_))
-    }
-    
-    fn is_err(&self) -> bool {
-        matches!(self, Result::Err(_))
-    }
-}
-
-impl<T> Option<T> {
-    fn unwrap(self) -> T {
-        match self {
-            Option::Some(value) => value,
-            Option::None => panic!("Called Option::unwrap() on a None value"),
-        }
-    }
-    
-    fn unwrap_or(self, default: T) -> T {
-        match self {
-            Option::Some(value) => value,
-            Option::None => default,
-        }
-    }
-}
-```
-
-> **⚠️ Important Notes**:
-> - `impl` blocks for generic enums must be placed outside the enum definition.
-> - When implementing methods, you must explicitly write `impl<T>` (or `impl<T: Bound>` with constraints).
-
-### 5.2.5 Generic Struct vs Generic Enum
-
-| Feature              | Generic Struct                  | Generic Enum                     |
-|----------------------|---------------------------------|----------------------------------|
-| **Use Case**         | Data containers, logic encapsulation | State machines, polymorphic patterns, branching logic |
-| **Flexibility**      | Good for grouping same-type properties | Good for expressing “different behaviors for different cases” |
-| **Method Implementation** | `impl<T> StructName`           | `impl<T> EnumName`               |
-| **Typical Examples** | `Box<T>`, `Vec<T>`              | `Option<T>`, `Result<T, E>`      |
-
-### 📝 When to Use Which?
-
-1. **Use Generic Struct**:
-   - When you want to encapsulate a set of **properties** of the **same type** (e.g., `first` and `second` in `Pair<T>` are both `T`).
-   - When you want a Java-like class feel for data encapsulation.
-
-2. **Use Generic Enum**:
-   - When you have **multiple patterns** representing **different behaviors** (e.g., `Option` is “has value” or “no value”; `Result` is “success” or “failure”).
-   - Enums allow you to define types directly in the definition — one of Rust’s most powerful generic features.
-
-## 5.3 Traits
-
-### 5.3.1 What Are Traits?
-
-A trait defines a set of methods that different types can implement. They are similar to interfaces in other languages but far more powerful.
-
-**The Essence of Rust Traits**:
-It defines a collection of **behaviors (methods)**. If a type implements a trait, it gains those behaviors.
-
-> **Rust Traits vs Java/C++ Interfaces**:
-> Java/C++ interfaces usually refer to runtime polymorphism (dynamic typing).
-> Rust traits point to **compile-time polymorphism** (static typing).
-> - **Java**: Runtime polymorphism (`obj.method()` calls the interface at runtime).
-> - **Rust**: Compile-time polymorphism (the trait is a template; the compiler generates concrete code for each type with zero runtime overhead).
-
-#### 🧩 Why Does Rust Need Traits?
-1. **Abstraction**: Unify behaviors across different structs.
-2. **Type Safety**: Ensure `T` can only be used when it has certain capabilities (e.g., `Copy`, `Send`).
-3. **Zero-Cost Abstraction**: Trait constraints are resolved at compile time — no virtual table overhead at runtime.
-
-### 5.3.2 Basic Syntax: Definition and Implementation
-
-Rust traits consist of two parts: **Definition** and **Implementation**.
-
-#### 5.3.2.1 Defining a Trait
-Use the `trait` keyword to define a set of methods.
-
-```rust
-// Define a 'Clone' trait (similar to std)
-trait Clone {
-    fn clone(&self) -> Self;
-}
-
-// Define 'Display' trait for printing
-trait Display {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error>;
-}
-```
-
-#### 5.3.2.2 Implementing a Trait
-Implement the trait methods for a specific type (struct or enum).
-
-```rust
-struct Boxed<T> {
-    data: T,
-}
-
-// Implement Clone for Boxed<T>
-impl<T> Clone for Boxed<T> {
-    fn clone(&self) -> Boxed<T> {
-        Boxed {
-            data: self.data.clone(),
-        }
-    }
-}
-```
-
-> **💡 Note**:
-> - Use the syntax `impl TraitName for Type` when implementing a trait.
-> - For generic types (e.g., `Boxed<T>`), the implementation must include the generic parameter `<T>`.
-
-```rust
-// Define a trait
-pub trait Drawable {
-    fn draw(&self) -> String;
-    
-    // Default implementation
-    fn area(&self) -> f64 {
-        0.0  // Default area is 0
-    }
-    
-    fn is_visible(&self) -> bool {
-        true  // Default is visible
-    }
-}
-
-// Types that implement the trait
-struct Circle {
-    radius: f64,
-}
-
-struct Rectangle {
-    width: f64,
-    height: f64,
-}
-
-struct Triangle {
-    base: f64,
-    height: f64,
-}
-
-// Implement Drawable for each type
-impl Drawable for Circle {
-    fn draw(&self) -> String {
-        format!("Drawing a circle with radius {}", self.radius)
-    }
-    
-    fn area(&self) -> f64 {
-        std::f64::consts::PI * self.radius * self.radius
-    }
-}
-
-impl Drawable for Rectangle {
-    fn draw(&self) -> String {
-        format!("Drawing a {}x{} rectangle", self.width, self.height)
-    }
-    
-    fn area(&self) -> f64 {
-        self.width * self.height
-    }
-}
-
-impl Drawable for Triangle {
-    fn draw(&self) -> String {
-        format!("Drawing a triangle with base {} and height {}", self.base, self.height)
-    }
-    
-    fn area(&self) -> f64 {
-        (self.base * self.height) / 2.0
-    }
-}
-
-// Function that accepts any type implementing the trait
-fn draw_shape<T: Drawable>(shape: &T) {
-    println!("{}", shape.draw());
-    println!("Area: {:.2}", shape.area());
-    println!("Visible: {}", shape.is_visible());
-    println!("---");
-}
-
-fn main() {
-    let circle = Circle { radius: 5.0 };
-    let rectangle = Rectangle { width: 4.0, height: 6.0 };
-    let triangle = Triangle { base: 3.0, height: 4.0 };
-    
-    draw_shape(&circle);
-    draw_shape(&rectangle);
-    draw_shape(&triangle);
-}
-```
-
-### 5.3.3 Traits as Parameters
-
-**“Trait as Parameter”** does not mean passing the trait definition itself (Rust does not support that), but rather how to use a trait’s capabilities in a function.
-
-There are two main approaches:
-1. **Generic constraints (`where T: Trait`)**: Compile-time checking, type-safe.
-2. **Trait objects (`&dyn Trait`)**: Runtime polymorphism, type erasure.
-
-```rust
-// Using a trait as a function parameter
-trait Addable<T> {
-    fn add(&self, other: &T) -> T;
-}
-
-// Generic function
-fn process<T: Addable>(value: T) {
-    // T must implement Addable
-    println!("Value is: {}", value);
-}
-```
-
-**💡 Key Points**
-- You can also use a `where` clause to add constraints:
-    ```rust
-    fn process<T>(value: T) where T: Addable { ... }
-    ```
-- **Performance**: This is **zero-cost**. The compiler generates concrete code versions with no runtime overhead.
-
-## 5.4 Advanced Trait Bounds
-
-### 5.4.1 Multiple Trait Bounds
-
-Rust allows a type `T` to satisfy multiple traits simultaneously. You can combine them using the `+` operator.
-
-**Syntax:**
-```rust
-fn process<T: TraitA + TraitB + TraitC>(item: T) { ... }
-```
-
-### 5.4.2 Why Combine Constraints?
-
-A single constraint is often not enough. For example, you may need a type that is both `Clone`, `Debug`, and `Send`.
-
-```rust
-// Correct way: combined bounds
-fn process<T: Cloneable + Printable + ThreadSafe>(item: T) {
-    let _clone = item.clone();
-    item.print();
-    // item must be thread-safe
-}
-```
-
-The order of bounds does **not** matter.
-
-### 5.4.3 Using `where` Clauses
-
-The `where` clause is more flexible for complex scenarios.
-
-```rust
-fn process_item<T>(item: &T) 
-where
-    T: Printable + Cloneable + Validatable,
-{
-    // ...
-}
-```
-
-### 5.4.4 Trait Objects (Dynamic Polymorphism)
-
-`dyn Trait` represents a dynamic polymorphic object. Rust allows `&dyn Trait` or `Box<dyn Trait>` to hold trait objects.
-
-```rust
-trait Drawable {
-    fn draw(&self);
-}
-
-struct Circle { r: f64 }
-struct Square { side: f64 }
-
-impl Drawable for Circle {
-    fn draw(&self) { println!("Drawing Circle"); }
-}
-
-impl Drawable for Square {
-    fn draw(&self) { println!("Drawing Square"); }
-}
-
-fn main() {
-    let shapes: Vec<Box<dyn Drawable>> = vec![
-        Box::new(Circle { r: 5.0 }),
-        Box::new(Square { side: 5.0 }),
+    // &dyn Summary is a trait object: dispatched via a vtable at runtime
+    let items: Vec<Box<dyn Summary>> = vec![
+        Box::new(Article { title: "a".into(), content: "b".into() }),
     ];
-    
-    for shape in &shapes {
-        shape.draw();  // Dynamic dispatch at runtime
+    for it in &items {
+        println!("{}", it.summarize());
     }
 }
 ```
 
-### 5.4.5 Static Dispatch vs Dynamic Dispatch
+| Form | Dispatch | Overhead | Holds many types? |
+|------|----------|----------|-------------------|
+| Generic `T: Trait` | static (monomorphized) | none | no (one per type) |
+| `&dyn Trait` / `Box<dyn Trait>` | dynamic (vtable) | one indirect call | yes |
 
-| Feature                | Generic Constraint (`T: Trait`) | Trait Object (`dyn Trait`)     |
-|------------------------|----------------------------------|--------------------------------|
-| **Dispatch**           | Static (compile time)           | Dynamic (runtime)              |
-| **Performance**        | Zero overhead (monomorphization)| Virtual table lookup           |
-| **Flexibility**        | Same type only                  | Different types in one collection |
-| **Use Case**           | Performance-critical code       | Heterogeneous collections      |
+**Rule of thumb**: prefer generics when you can (faster); reach for `dyn` only when you need runtime polymorphism.
+
+---
+
+## 5.5 Associated Types
+
+An associated type lets a trait carry a "type decided by the implementer," which often fits a domain better than a generic parameter. `Iterator` is the classic example:
 
 ```rust
-// Static dispatch - better performance
-fn draw_shapes_generic<T: Drawable>(shapes: &[T]) { ... }
+trait Iterator {
+    type Item;                       // associated type
+    fn next(&mut self) -> Option<Self::Item>;
+}
 
-// Dynamic dispatch - more flexible
-fn draw_shapes_dyn(shapes: &[Box<dyn Drawable>]) { ... }
+struct Counter { count: u32 }
+
+impl Iterator for Counter {
+    type Item = u32;                 // Counter yields u32
+    fn next(&mut self) -> Option<u32> {
+        self.count += 1;
+        if self.count <= 5 { Some(self.count) } else { None }
+    }
+}
+
+fn main() {
+    for n in Counter { count: 0 } {
+        println!("{n}");
+    }
+}
 ```
 
-## 5.13 Chapter Summary
-
-In this chapter, we systematically explored Rust’s two core abstraction mechanisms — **Generics** and **Traits**. We learned how to use them to design flexible, high-performance, and extensible code.
-
-**Key Takeaways:**
-
-- **Generics** provide zero-cost abstraction through type parameters.
-- **Traits** provide behavioral abstraction.
-- Combining both allows you to build highly reusable and type-safe architectures.
-- Static dispatch (generics) offers maximum performance.
-- Dynamic dispatch (trait objects) offers maximum flexibility.
-
-> **Core Takeaway**:  
-> **Generics make code “generic,” traits make code “behavioral.” Together, they make Rust code both safe and flexible.**
+The difference from a generic parameter: a type can have only one `impl` of a trait with an associated type (the type is fixed), whereas a generic trait can have several `impl`s (one per set of type parameters). `Iterator` uses an associated type because "what an iterator yields" is fixed for a given iterator.
 
 ---
 
-### 5.14 Acceptance Criteria (Self-Check)
+## 5.6 Summary
 
-After this chapter, you should be able to confidently:
+Generics write type-agnostic code that is monomorphized and zero-cost at compile time; traits define "what a type can do" and constrain generics via trait bounds. Static dispatch (generics) is fast but cannot be polymorphic at runtime; dynamic dispatch (`dyn Trait`) is flexible but has a vtable cost. Associated types make a trait's interface fit the domain. Together these are how Rust abstracts without losing performance.
 
-**Basic:**
-- Define generic functions, structs, and enums and implement methods for them.
-- Implement standard traits (`Debug`, `Clone`, `Display`) and custom traits.
-- Use `T: Trait` or `where` clauses to constrain generics.
+### Exercises
 
-**Advanced:**
-- Explain the difference between static dispatch (generics) and dynamic dispatch (trait objects), including pros/cons and use cases.
-- Use multiple trait bounds (`+` or `where`).
-- Design traits with associated types.
-
-**Project:**
-- Build a generic data processing pipeline using traits and trait objects.
-
----
-
-### 5.15 Exercises
-
-#### Basic Exercises
-
-1. Define a generic struct `Pair<T>` with `first` and `second` fields. Implement `new()` and `swap()` methods.
-2. Define a `Summable` trait with a `sum(&self) -> i32` method. Implement it for `Vec<i32>` and a custom `Point { x: i32, y: i32 }`.
-3. Write a generic function `print_if_large<T: PartialOrd + Display>(value: T, threshold: T)` that prints the value if it is greater than the threshold.
-
-#### Intermediate Exercises
-
-4. Implement a generic enum `Either<L, R>` with `Left(L)` and `Right(R)`. Add an `unwrap_left(self) -> L` method that panics if it is `Right`.
-5. Define a `Processable` trait with an associated type `Output`. Implement it for `String` (returns length) and `i32` (returns square). Write a generic function that uses the associated type.
-6. Create a `DataPipeline<T>` that uses `Vec<Box<dyn Processor>>` to support dynamically adding processors.
-
-#### Advanced Exercises
-
-7. Design a logging system with a `Logger` trait, `ConsoleLogger`, and `FileLogger`. Implement both static (`T: Logger`) and dynamic (`Box<dyn Logger>`) versions and compare them.
-8. Extend the data processing framework with `DataSource`, `DataTransformer`, and `DataSink` traits, then build a generic `Pipeline` that connects them end-to-end.
-
----
-
-### 5.16 Further Reading
-
-For deeper understanding, refer to the official resources:
-
-- [The Rust Book - Generics](https://doc.rust-lang.org/book/ch10-00-generics.html)
-- [The Rust Book - Traits](https://doc.rust-lang.org/book/ch10-02-traits.html)
-- [The Rust Reference - Trait Objects](https://doc.rust-lang.org/reference/types/trait-object.html)
-
----
+1. Write a generic `fn first<T>(v: &[T]) -> Option<&T>` returning the first element of a slice.
+2. Define a `Drawable` trait (`fn draw(&self)`), implement it for two different structs, and hold them in a `Vec<Box<dyn Drawable>>` to iterate.
+3. Add a `take_n` method to the `Counter` above (returning `impl Iterator`) and observe how the associated type propagates.
